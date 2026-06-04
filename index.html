@@ -1,0 +1,1100 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Le Grand Tour</title>
+<meta name="theme-color" content="#F2F2F7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Le Grand Tour">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%231F4DE6%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%231F4DE6%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Le%20Grand%20Tour%22%2C%22short_name%22%3A%22Le%20Grand%20Tour%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23F2F2F7%22%2C%22theme_color%22%3A%22%23F2F2F7%22%2C%22start_url%22%3A%22./%22%2C%22scope%22%3A%22./%22%7D">
+<style>html,body,#root{height:100%;margin:0}body{background:#F2F2F7;-webkit-text-size-adjust:100%}</style>
+<script type="importmap">
+{ "imports": {
+  "react": "https://esm.sh/react@18.3.1",
+  "react-dom": "https://esm.sh/react-dom@18.3.1?external=react",
+  "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?external=react",
+  "lucide-react": "https://esm.sh/lucide-react@0.383.0?external=react"
+} }
+</script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, MapPin, Wine,
+  UtensilsCrossed, Camera, Sparkles, Check, Plus, Copy, Trash2, Star,
+  Luggage, Ticket, ChevronDown, Wallet, BookOpen, CalendarDays, X,
+  Bed, Globe, Pencil, Home, Clock
+} from "lucide-react";
+
+/* ============================== DATA ============================== */
+
+const TRIP = { start: "2026-06-04", end: "2026-06-22", total: 19 };
+
+const CCY = {
+  EUR: { sym: "€", label: "EUR" },
+  GBP: { sym: "£", label: "GBP" },
+  DKK: { sym: "kr", label: "DKK" },
+  AUD: { sym: "$", label: "AUD" },
+};
+
+const DEFAULT_FX = { EUR: 1.65, GBP: 1.95, DKK: 0.221, AUD: 1 }; // AUD per 1 unit
+
+const CLIMATE = {
+  Paris:      { icon: "cloudsun", hi: 23, lo: 13, cond: "Mild, partly cloudy", rain: "Occasional showers" },
+  Bordeaux:   { icon: "sun",      hi: 26, lo: 14, cond: "Warm, mostly sunny",   rain: "Low chance of rain" },
+  Copenhagen: { icon: "cloud",    hi: 19, lo: 12, cond: "Cool, breezy, changeable", rain: "Showers likely" },
+  London:     { icon: "cloudsun", hi: 21, lo: 12, cond: "Mild, mixed sky",      rain: "Showers likely" },
+  SydKL:      { icon: "cloudrain",hi: 32, lo: 15, cond: "SYD cool → KL hot & humid", rain: "KL thunderstorms" },
+  KL:         { icon: "cloudrain",hi: 32, lo: 24, cond: "Hot, humid",           rain: "Afternoon storms" },
+  Sydney:     { icon: "sun",      hi: 18, lo: 9,  cond: "Winter, cool & clear",  rain: "Low" },
+};
+
+// Time zones for the trip dates (June). Sydney is AEST (UTC+10, no DST in winter);
+// Europe is on summer time. "ahead" = hours Sydney is ahead of the local zone.
+const TZ = {
+  Paris:      { z:"CEST", utc:"UTC+2",  ahead:8 },
+  Bordeaux:   { z:"CEST", utc:"UTC+2",  ahead:8 },
+  Copenhagen: { z:"CEST", utc:"UTC+2",  ahead:8 },
+  London:     { z:"BST",  utc:"UTC+1",  ahead:9 },
+  KL:         { z:"MYT",  utc:"UTC+8",  ahead:2 },
+  Sydney:     { z:"AEST", utc:"UTC+10", ahead:0 },
+  SydKL:      { z:"AEST → MYT", utc:"UTC+10 → +8", ahead:0, transit:"Departing Sydney (AEST). Kuala Lumpur is 2h behind." },
+};
+
+function tzChip(tz) {
+  if (tz.transit) return "SYD → KL";
+  if (tz.ahead === 0) return "SYD time";
+  return `SYD +${tz.ahead}h`;
+}
+function tzFull(tz) {
+  if (tz.transit) return tz.transit;
+  if (tz.ahead === 0) return `${tz.z} (${tz.utc}) · home time`;
+  return `${tz.z} (${tz.utc}) · Sydney is ${tz.ahead}h ahead`;
+}
+
+const ITINERARY = [
+  { date:"2026-06-04", dow:"Thu", city:"Transit", disp:"Sydney → Kuala Lumpur", country:null, w:"SydKL", ccy:"AUD",
+    hotel:{ name:"Overnight flight", note:"In the air" },
+    legs:[
+      {kind:"flight", code:"MH122", route:"Sydney T1 → Kuala Lumpur T1", time:"13:05 → 20:00", detail:"Economy · seats 11H / 11K"},
+      {kind:"flight", code:"MH20",  route:"Kuala Lumpur T1 → Paris CDG T2", time:"23:40 → 06:55 (+1)", detail:"Seats 12F / 12G"},
+    ], plan:[] },
+  { date:"2026-06-05", dow:"Fri", city:"Paris", disp:"Paris", country:"France", w:"Paris", ccy:"EUR",
+    hotel:{ name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris (Latin Quarter, 5th arr.)", ref:"QA62N49RX", checkin:"Check-in from 16:00" },
+    legs:[{kind:"flight", code:"MH20", route:"Arrive Paris CDG T2", time:"06:55", detail:"Customs & immigration, then to hotel"}],
+    plan:["Latin Quarter wander","Hotel check-in from 16:00"] },
+  { date:"2026-06-06", dow:"Sat", city:"Paris", disp:"Paris", country:"France", w:"Paris", ccy:"EUR",
+    hotel:{ name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris", ref:"QA62N49RX" },
+    legs:[], plan:["Le Marais wander","L'As du Fallafel (lunch)","Le Village Saint-Paul (vintage arcade shops)","Du Pain et des Idées (patisserie)","Miller, Rue Saint-Honoré (jewellery)"] },
+  { date:"2026-06-07", dow:"Sun", city:"Paris", disp:"Paris", country:"France", w:"Paris", ccy:"EUR",
+    hotel:{ name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris", ref:"QA62N49RX" },
+    legs:[], plan:["Musée du Louvre — tickets 11:00","Hôtel Dame des Arts (rooftop bar)"] },
+  { date:"2026-06-08", dow:"Mon", city:"Bordeaux", disp:"Paris → Bordeaux", country:"France", w:"Bordeaux", ccy:"EUR",
+    hotel:{ name:"Bordeaux stay", editKey:"bordeaux" },
+    legs:[{kind:"train", code:"TGV INOUI 8572", route:"Paris Montparnasse 1 et 2 → Bordeaux-Saint-Jean", time:"10:05 → 12:14", detail:"1st class · coach 3 upper deck · seats 374 / 375"}],
+    plan:["Check out Paris (AM)","Yarra (wine bar)"] },
+  { date:"2026-06-09", dow:"Tue", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", ccy:"EUR", hotel:{ name:"Bordeaux stay", editKey:"bordeaux" }, legs:[], plan:[] },
+  { date:"2026-06-10", dow:"Wed", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", ccy:"EUR", hotel:{ name:"Bordeaux stay", editKey:"bordeaux" }, legs:[], plan:[] },
+  { date:"2026-06-11", dow:"Thu", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", ccy:"EUR", hotel:{ name:"Bordeaux stay", editKey:"bordeaux" }, legs:[], plan:[] },
+  { date:"2026-06-12", dow:"Fri", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", ccy:"EUR", hotel:{ name:"Bordeaux stay", editKey:"bordeaux" }, legs:[], plan:[] },
+  { date:"2026-06-13", dow:"Sat", city:"Copenhagen", disp:"Bordeaux → Copenhagen", country:"Denmark", w:"Copenhagen", ccy:"DKK",
+    hotel:{ name:"Copenhagen stay", editKey:"copenhagen" },
+    legs:[
+      {kind:"flight", code:"AF7435", route:"Bordeaux → Paris CDG", time:"14:05 → 15:25", detail:"Hall B / Aérogare 2 Term F"},
+      {kind:"flight", code:"AF1050", route:"Paris CDG → Copenhagen T3", time:"16:50 → 18:45", detail:""},
+    ], plan:["Check out Bordeaux"] },
+  { date:"2026-06-14", dow:"Sun", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", ccy:"DKK", hotel:{ name:"Copenhagen stay", editKey:"copenhagen" }, legs:[], plan:[] },
+  { date:"2026-06-15", dow:"Mon", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", ccy:"DKK", hotel:{ name:"Copenhagen stay", editKey:"copenhagen" }, legs:[], plan:[] },
+  { date:"2026-06-16", dow:"Tue", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", ccy:"DKK", hotel:{ name:"Copenhagen stay", editKey:"copenhagen" }, legs:[], plan:[] },
+  { date:"2026-06-17", dow:"Wed", city:"London", disp:"Copenhagen → London", country:"United Kingdom", w:"London", ccy:"GBP",
+    hotel:{ name:"London stay", editKey:"london" },
+    legs:[{kind:"flight", code:"SK505", route:"Copenhagen T3 → London Heathrow T2", time:"15:00 → 16:00", detail:"SAS, operated by SAS Connect"}],
+    plan:["Check out Copenhagen"] },
+  { date:"2026-06-18", dow:"Thu", city:"London", disp:"London", country:"United Kingdom", w:"London", ccy:"GBP", hotel:{ name:"London stay", editKey:"london" }, legs:[], plan:[] },
+  { date:"2026-06-19", dow:"Fri", city:"London", disp:"London", country:"United Kingdom", w:"London", ccy:"GBP", hotel:{ name:"London stay", editKey:"london" }, legs:[], plan:[] },
+  { date:"2026-06-20", dow:"Sat", city:"London", disp:"London → home (overnight)", country:"United Kingdom", w:"London", ccy:"GBP",
+    hotel:{ name:"Overnight flight", note:"In the air" },
+    legs:[{kind:"flight", code:"MH1", route:"London Heathrow T4 → Kuala Lumpur T1", time:"21:35 → 17:50 (+1)", detail:"Seats 12F / 12G"}],
+    plan:["Check out London"] },
+  { date:"2026-06-21", dow:"Sun", city:"Transit", disp:"In transit (Kuala Lumpur)", country:null, w:"KL", ccy:"AUD",
+    hotel:{ name:"Overnight flight", note:"In the air" },
+    legs:[{kind:"flight", code:"MH251", route:"Kuala Lumpur T1 → Sydney", time:"20:00 → 07:00 (+1)", detail:"Seats 10H / 10K"}], plan:[] },
+  { date:"2026-06-22", dow:"Mon", city:"Sydney", disp:"Arrive Sydney", country:"Australia", w:"Sydney", ccy:"AUD",
+    hotel:{ name:"Home", note:"" },
+    legs:[{kind:"flight", code:"MH251", route:"Arrive Sydney T1", time:"07:00", detail:"Customs & immigration"}], plan:["Home"] },
+];
+
+const VAULT_FLIGHTS = [
+  { code:"MH122", route:"Sydney T1 → Kuala Lumpur T1", date:"Thu 4 Jun", time:"13:05 → 20:00", seats:"11H / 11K", note:"Economy" },
+  { code:"MH20",  route:"Kuala Lumpur T1 → Paris CDG T2", date:"Thu 4 → Fri 5 Jun", time:"23:40 → 06:55", seats:"12F / 12G", note:"" },
+  { code:"TGV INOUI 8572", route:"Paris Montparnasse → Bordeaux-St-Jean", date:"Mon 8 Jun", time:"10:05 → 12:14", seats:"374 / 375", note:"1st class · coach 3 upper deck" },
+  { code:"AF7435", route:"Bordeaux → Paris CDG", date:"Sat 13 Jun", time:"14:05 → 15:25", seats:"", note:"Hall B / Aérogare 2 Term F" },
+  { code:"AF1050", route:"Paris CDG → Copenhagen T3", date:"Sat 13 Jun", time:"16:50 → 18:45", seats:"", note:"" },
+  { code:"SK505",  route:"Copenhagen T3 → London Heathrow T2", date:"Wed 17 Jun", time:"15:00 → 16:00", seats:"", note:"SAS, op. by SAS Connect" },
+  { code:"MH1",    route:"London Heathrow T4 → Kuala Lumpur T1", date:"Sat 20 → Sun 21 Jun", time:"21:35 → 17:50", seats:"12F / 12G", note:"" },
+  { code:"MH251",  route:"Kuala Lumpur T1 → Sydney T1", date:"Sun 21 → Mon 22 Jun", time:"20:00 → 07:00", seats:"10H / 10K", note:"" },
+];
+
+const VAULT_HOTELS = [
+  { key:"paris", city:"Paris", name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris", ref:"QA62N49RX", dates:"5 → 8 Jun", fixed:true },
+  { key:"bordeaux", city:"Bordeaux", name:"", address:"", ref:"", dates:"8 → 13 Jun", fixed:false },
+  { key:"copenhagen", city:"Copenhagen", name:"", address:"", ref:"", dates:"13 → 17 Jun", fixed:false },
+  { key:"london", city:"London", name:"", address:"", ref:"", dates:"17 → 20 Jun", fixed:false },
+];
+
+const PACKING = [
+  { cat:"Clothes", items:[
+    {t:"Lightweight jacket / blazer", n:"Packable, water-resistant, neutral"},
+    {t:"Polos (2-3)", n:"Plain, neutral tones"},
+    {t:"Casual shirts (2-3)", n:"Linen / cotton, wrinkle-resistant"},
+    {t:"2× oxford shirts"}, {t:"2× linen shirts"},
+    {t:"Clean T-shirts", n:"Merino resists odour"},
+    {t:"Tailored trousers (1-2)", n:"Stretch wool"},
+    {t:"Chinos (1-2)", n:"Stone / navy / olive"},
+    {t:"Black Venroy shorts"}, {t:"New Zara shorts"}, {t:"Lulu shorts"}, {t:"Swim shorts"},
+    {t:"Tan PJ trousers"}, {t:"Sleeping clothes"},
+    {t:"Lightweight training set", n:"Doubles as loungewear"},
+    {t:"Exercise clothes ×3 sets"}, {t:"Green polo shirt"},
+    {t:"Undies & socks (16 days)"}, {t:"Laundry bag"},
+  ]},
+  { cat:"Shoes", items:[
+    {t:"Hoka black runners"},{t:"Brown loafers"},{t:"Black Belgian loafers"},{t:"Havaianas"},{t:"Morjas espadrilles"},
+  ]},
+  { cat:"Accessories", items:[
+    {t:"Caps / hats ×2"},{t:"Leather & silver watch"},{t:"Sunglasses + case"},{t:"Rope belt + leather belt"},
+  ]},
+  { cat:"Medications", items:[
+    {t:"Basic medication kit", n:"Paracetamol, ibuprofen, antihistamine, gastro; original packaging", c:true},
+    {t:"Scripts & supplements", n:"Dex, Vyvanse, B12, Vit D, Melatonin, Magnesium, hair", c:true},
+    {t:"Compeed blister plasters", n:"Mixed sizes — you'll walk a lot"},
+  ]},
+  { cat:"Toiletries", items:[
+    {t:"Moisturiser, tret, cleanser", n:"≤100ml, liquids bag"},
+    {t:"Nail clippers", n:"Mind scissor length"},
+    {t:"Toothbrush / floss"},{t:"Hairbrush"},{t:"Deodorant"},{t:"Hairspray + wax"},
+  ]},
+  { cat:"Electronics", items:[
+    {t:"Universal travel adaptor (USB-C)", n:"EU Type C/F · UK differs"},
+    {t:"Two-port USB-C charger", n:"GaN 35-65W"},
+    {t:"Power bank 10,000mAh", n:"Carry-on only, never checked", c:true},
+    {t:"Noise-cancelling headphones", n:"Charge pre-flight", c:true},
+    {t:"AirTags / trackers", n:"One in checked bag"},
+    {t:"Charging cables"},
+    {t:"Work laptop + mouse", c:true},
+    {t:"AirPods ×2 + wired headphones"},
+    {t:"Laptop charger"},
+    {t:"iPhone wall charger + 2 cables"},
+  ]},
+  { cat:"Documents", items:[
+    {t:"Passport", n:"6+ months validity", c:true},
+    {t:"Printed passport & insurance copies", n:"Separate from originals + cloud copy", c:true},
+    {t:"Travel insurance", n:"Harriet to confirm last year's policy is active"},
+    {t:"eSIM", n:"France, Denmark, England — install before flying"},
+    {t:"Wallet setup (cards / tickets)", n:"Train + flight apps · Flighty"},
+    {t:"Backup card stored separately", n:"Low / no FX-fee"},
+  ]},
+  { cat:"Work", items:[
+    {t:"OneDrive mobile access", n:"All file access working on mobile"},
+  ]},
+];
+
+/* ============================== HELPERS ============================== */
+
+const STORE_KEY = "euro26:v1";
+
+/* ---------- storage adapter ----------
+   Per-device by default (localStorage). To SHARE one synced dataset between
+   both phones: create a free bin at jsonbin.io and paste its Bin ID and
+   X-Master-Key below. Leave blank to keep each phone separate. */
+const SYNC = {
+  binId: "",      // <-- paste JSONBin Bin ID here to enable sharing
+  masterKey: "",  // <-- paste JSONBin X-Master-Key here
+};
+const syncEnabled = () => Boolean(SYNC.binId && SYNC.masterKey);
+const store = {
+  syncEnabled,
+  async get() {
+    if (syncEnabled()) {
+      try {
+        const r = await fetch(`https://api.jsonbin.io/v3/b/${SYNC.binId}/latest`, {
+          headers: { "X-Master-Key": SYNC.masterKey, "X-Bin-Meta": "false" },
+        });
+        if (r.ok) return await r.json();
+      } catch (e) { /* fall back to local */ }
+    }
+    try { const v = localStorage.getItem(STORE_KEY); return v ? JSON.parse(v) : null; }
+    catch (e) { return null; }
+  },
+  async set(data) {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) {}
+    if (syncEnabled()) {
+      try {
+        await fetch(`https://api.jsonbin.io/v3/b/${SYNC.binId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "X-Master-Key": SYNC.masterKey },
+          body: JSON.stringify(data),
+        });
+      } catch (e) { /* keep local copy */ }
+    }
+  },
+};
+const uid = () => Math.random().toString(36).slice(2, 9);
+const todayCanon = () => new Date().toLocaleDateString("en-CA");
+
+function todayIndex() {
+  const t = todayCanon();
+  const idx = ITINERARY.findIndex(d => d.date === t);
+  if (idx >= 0) return idx;
+  if (t < ITINERARY[0].date) return 0;
+  return ITINERARY.length - 1;
+}
+
+function WeatherGlyph({ kind, size = 22 }) {
+  const p = { size, strokeWidth: 1.6 };
+  if (kind === "sun") return <Sun {...p} />;
+  if (kind === "cloud") return <Cloud {...p} />;
+  if (kind === "cloudrain") return <CloudRain {...p} />;
+  return <CloudSun {...p} />;
+}
+
+const TYPE_META = {
+  Meal:  { icon: UtensilsCrossed, color: "var(--olive)" },
+  Wine:  { icon: Wine,            color: "var(--wine)" },
+  Sight: { icon: Camera,          color: "var(--brass)" },
+  Moment:{ icon: Sparkles,        color: "var(--ink)" },
+};
+
+/* ============================== ROOT ============================== */
+
+function App() {
+  const tIndex = useMemo(todayIndex, []);
+  const [tab, setTab] = useState("today");
+  const [loaded, setLoaded] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const firstSave = useRef(true);
+  const [toast, setToast] = useState("");
+
+  const [state, setState] = useState({
+    weather: {}, planDone: {}, planAdd: {}, spend: [], journal: [],
+    packing: {}, fx: { ...DEFAULT_FX }, hotels: {},
+  });
+
+  // load
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const parsed = await store.get();
+        if (live && parsed && typeof parsed === "object") {
+          setState(s => ({ ...s, ...parsed, fx: { ...DEFAULT_FX, ...(parsed.fx || {}) } }));
+        }
+      } catch (e) { /* no saved state yet */ }
+      if (live) setLoaded(true);
+    })();
+    return () => { live = false; };
+  }, []);
+
+  // save (debounced)
+  useEffect(() => {
+    if (!loaded) return;
+    if (firstSave.current) { firstSave.current = false; return; }
+    const h = setTimeout(async () => {
+      try {
+        await store.set(state);
+        setSaved(true); setTimeout(() => setSaved(false), 1400);
+      } catch (e) { /* ignore */ }
+    }, 600);
+    return () => clearTimeout(h);
+  }, [state, loaded]);
+
+  // pull latest when the app regains focus (only while sharing is on)
+  useEffect(() => {
+    if (!loaded || !store.syncEnabled()) return;
+    const onVis = async () => {
+      if (document.visibilityState !== "visible") return;
+      const remote = await store.get();
+      if (remote && typeof remote === "object") {
+        setState(s => ({ ...s, ...remote, fx: { ...DEFAULT_FX, ...(remote.fx || {}) } }));
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [loaded]);
+
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 1600); };
+  const copy = (txt, label) => {
+    try { navigator.clipboard.writeText(txt); flash((label || "Copied") + " copied"); }
+    catch { flash("Copy failed"); }
+  };
+
+  /* derived stats */
+  const fx = state.fx;
+  const spendAUD = state.spend.reduce((a, e) => a + e.amount * (fx[e.ccy] || 1), 0);
+  const wines = state.journal.filter(j => j.type === "Wine").length;
+  const meals = state.journal.filter(j => j.type === "Meal").length;
+  const rated = state.journal.filter(j => j.you > 0);
+  const bestMeal = [...state.journal].filter(j => j.type === "Meal")
+    .sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
+
+  const ctx = { state, setState, fx, tIndex, copy, flash, uid };
+
+  return (
+    <div className="app">
+      <Style />
+      <div className="grain" />
+
+      <header className="topbar">
+        <div className="topbar-row">
+          <div>
+            <div className="kicker">EUROPE · JUNE 2026</div>
+            <div className="brandline">Le Grand Tour</div>
+          </div>
+          <div className="daychip">
+            <span className="daychip-num">Day {Math.min(tIndex + 1, TRIP.total)}</span>
+            <span className="daychip-of">/ {TRIP.total}</span>
+          </div>
+        </div>
+        <div className="progress"><div className="progress-fill" style={{ width: `${((tIndex + 1) / TRIP.total) * 100}%` }} /></div>
+        {saved && <div className="savedtag">saved</div>}
+      </header>
+
+      <main className="scroll">
+        {tab === "today"   && <Today {...ctx} />}
+        {tab === "days"    && <Days {...ctx} />}
+        {tab === "spend"   && <Spend {...ctx} spendAUD={spendAUD} />}
+        {tab === "journal" && <Journal {...ctx} stats={{ wines, meals, rated, bestMeal, spendAUD }} />}
+        {tab === "kit"     && <Kit {...ctx} />}
+      </main>
+
+      {toast && <div className="toast">{toast}</div>}
+
+      <nav className="tabbar">
+        {[
+          { id:"today", label:"Today", Icon:Sun },
+          { id:"days", label:"Days", Icon:CalendarDays },
+          { id:"spend", label:"Spend", Icon:Wallet },
+          { id:"journal", label:"Journal", Icon:BookOpen },
+          { id:"kit", label:"Kit", Icon:Luggage },
+        ].map(({ id, label, Icon }) => (
+          <button key={id} className={"tab" + (tab === id ? " active" : "")} onClick={() => setTab(id)}>
+            <Icon size={20} strokeWidth={tab === id ? 2.2 : 1.7} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+/* ============================== TODAY ============================== */
+
+function Today({ state, setState, fx, tIndex, copy }) {
+  const d = ITINERARY[tIndex];
+  const clim = CLIMATE[d.w];
+  const wOverride = state.weather[tIndex] || "";
+
+  const spendAUD = state.spend.reduce((a, e) => a + e.amount * (fx[e.ccy] || 1), 0);
+  const todaySpend = state.spend.filter(e => e.day === tIndex)
+    .reduce((a, e) => a + e.amount * (fx[e.ccy] || 1), 0);
+
+  const planItems = (d.plan || []).map((t, j) => ({ id: `d${tIndex}-p${j}`, t }))
+    .concat((state.planAdd[tIndex] || []));
+  const done = state.planDone[tIndex] || {};
+  const toggle = (id) => setState(s => ({ ...s, planDone: { ...s.planDone, [tIndex]: { ...(s.planDone[tIndex] || {}), [id]: !(s.planDone[tIndex] || {})[id] } } }));
+
+  return (
+    <div className="page">
+      <div className="hero">
+        <div className="hero-top">
+          <div>
+            <div className="hero-date">{d.dow} {fmtDate(d.date)}</div>
+            <div className="hero-city">{d.disp}</div>
+            {d.country && <div className="hero-country"><Globe size={12} /> {d.country}</div>}
+          </div>
+          <div className="hero-weather">
+            <WeatherGlyph kind={clim.icon} size={34} />
+            <div className="hero-temp">{clim.hi}°<span>/ {clim.lo}°</span></div>
+          </div>
+        </div>
+        <div className="hero-cond">{wOverride || `${clim.cond} · ${clim.rain}`}</div>
+        <input className="weather-input" placeholder="Tap to set today's real forecast…"
+          value={wOverride} onChange={e => setState(s => ({ ...s, weather: { ...s.weather, [tIndex]: e.target.value } }))} />
+      </div>
+
+      {d.hotel && (d.hotel.address || d.hotel.note) && (
+        <Card>
+          <div className="row-icon"><Bed size={16} /><span className="row-title">{d.hotel.name}</span></div>
+          {d.hotel.address && <div className="muted sm">{d.hotel.address}</div>}
+          {d.hotel.checkin && <div className="muted sm">{d.hotel.checkin}</div>}
+          {d.hotel.ref && <button className="reflink" onClick={() => copy(d.hotel.ref, "Booking ref")}><span>{d.hotel.ref}</span><Copy size={13} /></button>}
+          {d.hotel.note && <div className="muted sm">{d.hotel.note}</div>}
+        </Card>
+      )}
+
+      {d.legs.length > 0 && (
+        <div className="section-label">Today's moves</div>
+      )}
+      {d.legs.map((l, i) => <LegRow key={i} leg={l} copy={copy} />)}
+
+      <div className="section-label">Plan</div>
+      <Card>
+        {planItems.length === 0 && <div className="muted sm empty">Nothing locked in. Add something below as the day unfolds.</div>}
+        {planItems.map(p => (
+          <button key={p.id} className={"checkrow" + (done[p.id] ? " checked" : "")} onClick={() => toggle(p.id)}>
+            <span className="box">{done[p.id] && <Check size={13} strokeWidth={3} />}</span>
+            <span className="checktext">{p.t}</span>
+          </button>
+        ))}
+        <QuickAdd placeholder="Add to today…" onAdd={(t) => setState(s => ({ ...s, planAdd: { ...s.planAdd, [tIndex]: [ ...(s.planAdd[tIndex] || []), { id: uid(), t } ] } }))} />
+      </Card>
+
+      <div className="ministats">
+        <Stat label="Today" value={money(todaySpend, "AUD")} />
+        <Stat label="Trip total" value={money(spendAUD, "AUD")} />
+        <Stat label="Local" value={CCY[d.ccy].label} />
+      </div>
+    </div>
+  );
+}
+
+/* ============================== DAYS ============================== */
+
+function Days({ state, setState, tIndex, copy }) {
+  const [open, setOpen] = useState({ [tIndex]: true });
+  const toggleOpen = (i) => setOpen(o => ({ ...o, [i]: !o[i] }));
+
+  return (
+    <div className="page">
+      <div className="page-h">Itinerary</div>
+      {ITINERARY.map((d, i) => {
+        const clim = CLIMATE[d.w];
+        const tz = TZ[d.w] || TZ.Sydney;
+        const isOpen = open[i];
+        const isToday = i === tIndex;
+        const planItems = (d.plan || []).map((t, j) => ({ id: `d${i}-p${j}`, t })).concat((state.planAdd[i] || []));
+        const done = state.planDone[i] || {};
+        return (
+          <div key={i} className={"daycard" + (isToday ? " today" : "")} style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}>
+            <button className="daycard-head" onClick={() => toggleOpen(i)}>
+              <div className="daycard-date">
+                <div className="dc-dow">{d.dow}</div>
+                <div className="dc-num">{d.date.slice(8)}</div>
+              </div>
+              <div className="daycard-main">
+                <div className="dc-city">{d.disp}{isToday && <span className="todaybadge">today</span>}</div>
+                <div className="dc-sub">
+                  <span className="wchip"><WeatherGlyph kind={clim.icon} size={13} /> {clim.hi}°</span>
+                  <span className="tzchip"><Clock size={12} /> {tzChip(tz)}</span>
+                  {d.legs[0] && <span className="dc-leg">{d.legs[0].kind === "train" ? <TrainFront size={12} /> : <Plane size={12} />} {d.legs[0].code}</span>}
+                </div>
+              </div>
+              <ChevronDown size={18} className={"chev" + (isOpen ? " up" : "")} />
+            </button>
+            {isOpen && (
+              <div className="daycard-body">
+                <div className="tzline"><Clock size={13} /> {tzFull(tz)}</div>
+                {d.hotel && (d.hotel.address || d.hotel.note || d.hotel.editKey) && (
+                  <div className="bodyrow"><Bed size={14} />
+                    <div>
+                      <div className="row-title sm">{d.hotel.name}</div>
+                      {d.hotel.address && <div className="muted xs">{d.hotel.address}</div>}
+                      {d.hotel.ref && <button className="reflink xs" onClick={() => copy(d.hotel.ref, "Ref")}>{d.hotel.ref} <Copy size={11} /></button>}
+                      {d.hotel.editKey && !d.hotel.address && (
+                        <input className="inline-input" placeholder="Add accommodation…"
+                          value={state.hotels[d.hotel.editKey] || ""} onChange={e => setState(s => ({ ...s, hotels: { ...s.hotels, [d.hotel.editKey]: e.target.value } }))} />
+                      )}
+                      {d.hotel.note && <div className="muted xs">{d.hotel.note}</div>}
+                    </div>
+                  </div>
+                )}
+                {d.legs.map((l, k) => <LegRow key={k} leg={l} copy={copy} compact />)}
+                {planItems.map(p => (
+                  <button key={p.id} className={"checkrow sm" + (done[p.id] ? " checked" : "")}
+                    onClick={() => setState(s => ({ ...s, planDone: { ...s.planDone, [i]: { ...(s.planDone[i] || {}), [p.id]: !(s.planDone[i] || {})[p.id] } } }))}>
+                    <span className="box">{done[p.id] && <Check size={12} strokeWidth={3} />}</span>
+                    <span className="checktext">{p.t}</span>
+                  </button>
+                ))}
+                <QuickAdd placeholder="Add a stop…" onAdd={(t) => setState(s => ({ ...s, planAdd: { ...s.planAdd, [i]: [ ...(s.planAdd[i] || []), { id: uid(), t } ] } }))} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ============================== SPEND ============================== */
+
+function Spend({ state, setState, fx, tIndex, spendAUD }) {
+  const d = ITINERARY[tIndex];
+  const [amount, setAmount] = useState("");
+  const [ccy, setCcy] = useState(d.ccy);
+  const [cat, setCat] = useState("Food & drink");
+  const [note, setNote] = useState("");
+  const [showFx, setShowFx] = useState(false);
+
+  const cats = ["Food & drink", "Wine", "Hotel", "Transport", "Sights", "Shopping", "Other"];
+
+  const add = () => {
+    const a = parseFloat(amount);
+    if (!a || a <= 0) return;
+    setState(s => ({ ...s, spend: [{ id: uid(), amount: a, ccy, cat, note: note.trim(), day: tIndex, ts: Date.now() }, ...s.spend] }));
+    setAmount(""); setNote("");
+  };
+  const del = (id) => setState(s => ({ ...s, spend: s.spend.filter(e => e.id !== id) }));
+
+  // by category
+  const byCat = {};
+  state.spend.forEach(e => { byCat[e.cat] = (byCat[e.cat] || 0) + e.amount * (fx[e.ccy] || 1); });
+  const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const maxCat = catRows.length ? catRows[0][1] : 1;
+
+  return (
+    <div className="page">
+      <div className="page-h">Spend</div>
+
+      <div className="bigtotal">
+        <div className="bigtotal-label">Trip total</div>
+        <div className="bigtotal-num">{money(spendAUD, "AUD")}</div>
+        <div className="bigtotal-sub">{state.spend.length} entries · all converted to AUD</div>
+      </div>
+
+      <Card>
+        <div className="addrow">
+          <input className="amt" inputMode="decimal" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
+          <select className="sel" value={ccy} onChange={e => setCcy(e.target.value)}>
+            {Object.keys(CCY).map(c => <option key={c} value={c}>{CCY[c].sym} {c}</option>)}
+          </select>
+        </div>
+        <select className="sel full" value={cat} onChange={e => setCat(e.target.value)}>
+          {cats.map(c => <option key={c}>{c}</option>)}
+        </select>
+        <input className="inline-input full" placeholder="Note (optional)" value={note} onChange={e => setNote(e.target.value)} />
+        <button className="primary" onClick={add}><Plus size={15} /> Log spend</button>
+      </Card>
+
+      {catRows.length > 0 && (
+        <>
+          <div className="section-label">Where it's going</div>
+          <Card>
+            {catRows.map(([c, v]) => (
+              <div key={c} className="bar-row">
+                <div className="bar-top"><span>{c}</span><span className="bar-val">{money(v, "AUD")}</span></div>
+                <div className="bar-track"><div className="bar-fill" style={{ width: `${(v / maxCat) * 100}%` }} /></div>
+              </div>
+            ))}
+          </Card>
+        </>
+      )}
+
+      <button className="fxtoggle" onClick={() => setShowFx(v => !v)}>
+        <span>FX rates (indicative, editable)</span><ChevronDown size={15} className={"chev" + (showFx ? " up" : "")} />
+      </button>
+      {showFx && (
+        <Card>
+          <div className="muted xs" style={{ marginBottom: 8 }}>AUD per 1 unit. Update if the real rate drifts.</div>
+          {Object.keys(DEFAULT_FX).filter(c => c !== "AUD").map(c => (
+            <div key={c} className="fx-row">
+              <span>{CCY[c].sym} 1 {c}</span>
+              <div className="fx-edit">$ <input className="fx-input" inputMode="decimal" value={fx[c]}
+                onChange={e => setState(s => ({ ...s, fx: { ...s.fx, [c]: parseFloat(e.target.value) || 0 } }))} /> AUD</div>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      {state.spend.length > 0 && <div className="section-label">Log</div>}
+      {state.spend.map(e => (
+        <div key={e.id} className="logrow">
+          <div className="logrow-main">
+            <div className="logrow-top">{CCY[e.ccy].sym}{fmtNum(e.amount)} <span className="logrow-aud">≈ {money(e.amount * (fx[e.ccy] || 1), "AUD")}</span></div>
+            <div className="muted xs">{e.cat}{e.note ? ` · ${e.note}` : ""} · {ITINERARY[e.day].disp}</div>
+          </div>
+          <button className="del" onClick={() => del(e.id)}><Trash2 size={14} /></button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================== JOURNAL ============================== */
+
+function Journal({ state, setState, fx, tIndex, stats }) {
+  const d = ITINERARY[tIndex];
+  const [type, setType] = useState("Meal");
+  const [title, setTitle] = useState("");
+  const [note, setNote] = useState("");
+  const [you, setYou] = useState(0);
+  const [her, setHer] = useState(0);
+  const [region, setRegion] = useState("");
+  const [vintage, setVintage] = useState("");
+
+  const add = () => {
+    if (!title.trim()) return;
+    setState(s => ({ ...s, journal: [{
+      id: uid(), type, title: title.trim(), note: note.trim(), you, her,
+      region: region.trim(), vintage: vintage.trim(), city: d.city, day: tIndex, ts: Date.now(),
+    }, ...s.journal] }));
+    setTitle(""); setNote(""); setYou(0); setHer(0); setRegion(""); setVintage("");
+  };
+  const del = (id) => setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== id) }));
+
+  const avg = (k) => stats.rated.length ? (stats.rated.reduce((a, j) => a + j[k], 0) / stats.rated.length).toFixed(1) : "–";
+
+  return (
+    <div className="page">
+      <div className="page-h">Journal</div>
+
+      <div className="journal-stats">
+        <Stat label="Meals" value={stats.meals} />
+        <Stat label="Wines" value={stats.wines} />
+        <Stat label="You" value={avg("you")} accent />
+        <Stat label="Harriet" value={avg("her")} accent />
+      </div>
+
+      {stats.bestMeal && (
+        <div className="best">
+          <Sparkles size={14} /><span>Best meal so far — <strong>{stats.bestMeal.title}</strong> ({stats.bestMeal.city})</span>
+        </div>
+      )}
+
+      <Card>
+        <div className="typetabs">
+          {Object.keys(TYPE_META).map(tp => {
+            const Ic = TYPE_META[tp].icon;
+            return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} onClick={() => setType(tp)}><Ic size={15} /> {tp}</button>;
+          })}
+        </div>
+        <input className="inline-input full" placeholder={type === "Wine" ? "Producer / wine name…" : type === "Moment" ? "What happened…" : "Name…"} value={title} onChange={e => setTitle(e.target.value)} />
+        {type === "Wine" && (
+          <div className="addrow">
+            <input className="inline-input" placeholder="Region / appellation" value={region} onChange={e => setRegion(e.target.value)} />
+            <input className="inline-input vintage" placeholder="Vintage" value={vintage} onChange={e => setVintage(e.target.value)} />
+          </div>
+        )}
+        <input className="inline-input full" placeholder="Tasting note / thoughts…" value={note} onChange={e => setNote(e.target.value)} />
+        <div className="ratepair">
+          <RateRow label="You" value={you} onChange={setYou} />
+          <RateRow label="Harriet" value={her} onChange={setHer} />
+        </div>
+        <button className="primary" onClick={add}><Plus size={15} /> Add entry</button>
+      </Card>
+
+      {state.journal.map(j => {
+        const Ic = TYPE_META[j.type].icon;
+        const split = j.you > 0 && j.her > 0 && Math.abs(j.you - j.her) >= 2;
+        return (
+          <div key={j.id} className="jcard">
+            <div className="jcard-icon" style={{ color: TYPE_META[j.type].color }}><Ic size={16} /></div>
+            <div className="jcard-body">
+              <div className="jcard-title">{j.title}{j.vintage ? <span className="vint"> {j.vintage}</span> : ""}</div>
+              {(j.region || j.city) && <div className="muted xs">{[j.region, j.city].filter(Boolean).join(" · ")}</div>}
+              {j.note && <div className="jcard-note">{j.note}</div>}
+              <div className="jcard-rate">
+                <MiniStars label="You" v={j.you} />
+                <MiniStars label="H" v={j.her} />
+                {split && <span className="split">split decision</span>}
+              </div>
+            </div>
+            <button className="del" onClick={() => del(j.id)}><Trash2 size={14} /></button>
+          </div>
+        );
+      })}
+      {state.journal.length === 0 && <div className="muted sm empty pad">Log your first meal, glass or moment. By London this becomes the trip diary.</div>}
+    </div>
+  );
+}
+
+/* ============================== KIT ============================== */
+
+function Kit({ state, setState, copy }) {
+  const [sub, setSub] = useState("pack");
+  return (
+    <div className="page">
+      <div className="page-h">Kit</div>
+      <div className="subtabs">
+        <button className={"subtab" + (sub === "pack" ? " on" : "")} onClick={() => setSub("pack")}><Luggage size={15} /> Packing</button>
+        <button className={"subtab" + (sub === "vault" ? " on" : "")} onClick={() => setSub("vault")}><Ticket size={15} /> Vault</button>
+      </div>
+      {sub === "pack" ? <Packing state={state} setState={setState} /> : <Vault state={state} setState={setState} copy={copy} />}
+    </div>
+  );
+}
+
+function Packing({ state, setState }) {
+  const allIds = PACKING.flatMap((g, gi) => g.items.map((_, ii) => `${gi}-${ii}`));
+  const doneCount = allIds.filter(id => state.packing[id]).length;
+  const pct = Math.round((doneCount / allIds.length) * 100);
+  const toggle = (id) => setState(s => ({ ...s, packing: { ...s.packing, [id]: !s.packing[id] } }));
+
+  return (
+    <>
+      <div className="packbar">
+        <div className="packbar-top"><span>{doneCount} / {allIds.length} packed</span><span className="packbar-pct">{pct}%</span></div>
+        <div className="bar-track"><div className="bar-fill green" style={{ width: `${pct}%` }} /></div>
+      </div>
+      {PACKING.map((g, gi) => (
+        <div key={gi} className="packgroup">
+          <div className="packgroup-h">{g.cat}</div>
+          <Card>
+            {g.items.map((it, ii) => {
+              const id = `${gi}-${ii}`;
+              return (
+                <button key={id} className={"checkrow pack" + (state.packing[id] ? " checked" : "")} onClick={() => toggle(id)}>
+                  <span className="box">{state.packing[id] && <Check size={12} strokeWidth={3} />}</span>
+                  <span className="packtext">
+                    <span className="checktext">{it.t}{it.c && <span className="carry">carry-on</span>}</span>
+                    {it.n && <span className="muted xs">{it.n}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </Card>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function Vault({ state, setState, copy }) {
+  return (
+    <>
+      <div className="section-label">Flights & rail</div>
+      {VAULT_FLIGHTS.map((f, i) => (
+        <Card key={i}>
+          <div className="vault-head">
+            <button className="vault-code" onClick={() => copy(f.code, f.code)}>{f.code} <Copy size={12} /></button>
+            <span className="muted xs">{f.date}</span>
+          </div>
+          <div className="row-title sm">{f.route}</div>
+          <div className="vault-meta">
+            <span className="mono">{f.time}</span>
+            {f.seats && <button className="seatpill" onClick={() => copy(f.seats, "Seats")}>{f.seats} <Copy size={11} /></button>}
+          </div>
+          {f.note && <div className="muted xs">{f.note}</div>}
+        </Card>
+      ))}
+
+      <div className="section-label">Accommodation</div>
+      {VAULT_HOTELS.map(h => (
+        <Card key={h.key}>
+          <div className="vault-head"><span className="row-title sm">{h.city}</span><span className="muted xs">{h.dates}</span></div>
+          {h.fixed ? (
+            <>
+              <div className="sm">{h.name}</div>
+              <div className="muted xs">{h.address}</div>
+              <button className="reflink" onClick={() => copy(h.ref, "Booking ref")}><span>{h.ref}</span><Copy size={13} /></button>
+            </>
+          ) : (
+            <>
+              <input className="inline-input full" placeholder="Hotel name…" value={state.hotels[h.key] || ""}
+                onChange={e => setState(s => ({ ...s, hotels: { ...s.hotels, [h.key]: e.target.value } }))} />
+              <input className="inline-input full" placeholder="Address / booking ref…" value={state.hotels[h.key + "_d"] || ""}
+                onChange={e => setState(s => ({ ...s, hotels: { ...s.hotels, [h.key + "_d"]: e.target.value } }))} />
+            </>
+          )}
+        </Card>
+      ))}
+    </>
+  );
+}
+
+/* ============================== SHARED UI ============================== */
+
+function Card({ children }) { return <div className="card">{children}</div>; }
+
+function LegRow({ leg, copy, compact }) {
+  const Ic = leg.kind === "train" ? TrainFront : Plane;
+  return (
+    <div className={"leg" + (compact ? " compact" : "")}>
+      <div className="leg-ic"><Ic size={15} /></div>
+      <div className="leg-body">
+        <div className="leg-top"><button className="leg-code" onClick={() => copy(leg.code, leg.code)}>{leg.code} <Copy size={11} /></button><span className="mono">{leg.time}</span></div>
+        <div className="leg-route">{leg.route}</div>
+        {leg.detail && <div className="muted xs">{leg.detail}</div>}
+      </div>
+    </div>
+  );
+}
+
+function QuickAdd({ placeholder, onAdd }) {
+  const [v, setV] = useState("");
+  const go = () => { if (v.trim()) { onAdd(v.trim()); setV(""); } };
+  return (
+    <div className="quickadd">
+      <input value={v} placeholder={placeholder} onChange={e => setV(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") go(); }} />
+      <button onClick={go}><Plus size={16} /></button>
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }) {
+  return <div className={"stat" + (accent ? " accent" : "")}><div className="stat-v">{value}</div><div className="stat-l">{label}</div></div>;
+}
+
+function RateRow({ label, value, onChange }) {
+  return (
+    <div className="raterow">
+      <span className="rate-label">{label}</span>
+      <div className="stars">
+        {[1, 2, 3, 4, 5].map(n => (
+          <button key={n} className="starbtn" onClick={() => onChange(n === value ? 0 : n)}>
+            <Star size={20} fill={n <= value ? "var(--brass)" : "none"} stroke={n <= value ? "var(--brass)" : "var(--line2)"} strokeWidth={1.5} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MiniStars({ label, v }) {
+  return (
+    <span className="mini">
+      <span className="mini-l">{label}</span>
+      {[1, 2, 3, 4, 5].map(n => <Star key={n} size={11} fill={n <= v ? "var(--brass)" : "none"} stroke={n <= v ? "var(--brass)" : "var(--line2)"} strokeWidth={1.5} />)}
+    </span>
+  );
+}
+
+/* ============================== FORMAT ============================== */
+
+function fmtDate(iso) {
+  const m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const p = iso.split("-");
+  return `${parseInt(p[2], 10)} ${m[parseInt(p[1], 10) - 1]}`;
+}
+function fmtNum(n) { return n % 1 === 0 ? n.toString() : n.toFixed(2); }
+function money(n, c) {
+  const v = Math.round(n).toLocaleString("en-AU");
+  return `${CCY[c].sym}${v}`;
+}
+
+/* ============================== STYLE ============================== */
+
+function Style() {
+  return (
+    <style>{`
+:root{
+  --bg:#F2F2F7; --surface:#FFFFFF; --fill:#EDEDF2; --fill2:#E5E5EA;
+  --ink:#1D1D1F; --ink2:#6E6E73; --muted:#8E8E93;
+  --accent:#1F4DE6; --accent-d:#163BBD; --powder:#EAF0FF; --powder2:#C9D8FF;
+  /* legacy var names kept so component inline styles keep resolving */
+  --paper:#F2F2F7; --paper2:#EDEDF2; --card:#FFFFFF; --line:#EDEDF2; --line2:#C7C7CC;
+  --wine:#1F4DE6; --wine-d:#163BBD; --olive:#1F4DE6; --green:#1F4DE6; --brass:#1F4DE6;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 0 1px rgba(0,0,0,.04);
+  --shadow-float:0 6px 24px rgba(0,0,0,.10);
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",system-ui,sans-serif;
+  --serif:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;border:0;-webkit-tap-highlight-color:transparent;}
+.app{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;max-width:520px;margin:0 auto;position:relative;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+.grain{display:none;}
+.mono,.amt,.fx-input,.stat-v,.bigtotal-num,.logrow-top,.daychip-num,.dc-num{font-variant-numeric:tabular-nums;}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:20;background:rgba(242,242,247,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);padding:18px 20px 12px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;}
+.kicker{font-size:11px;letter-spacing:.02em;color:var(--muted);font-weight:600;}
+.brandline{font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:-.025em;line-height:1;margin-top:3px;color:var(--ink);}
+.daychip{display:flex;align-items:baseline;gap:4px;}
+.daychip-num{font-size:17px;font-weight:600;color:var(--ink);letter-spacing:-.01em;}
+.daychip-of{font-size:12px;color:var(--muted);}
+.progress{height:3px;background:var(--fill2);margin-top:14px;border-radius:3px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .6s cubic-bezier(.2,.8,.2,1);}
+.savedtag{position:absolute;right:20px;top:18px;font-size:11px;color:var(--muted);animation:fade .4s;}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+/* layout */
+.scroll{flex:1;overflow-y:auto;position:relative;z-index:2;padding-bottom:90px;}
+.page{padding:18px 16px 8px;}
+.page-h{font-family:var(--serif);font-size:32px;font-weight:700;letter-spacing:-.03em;margin:2px 4px 18px;}
+.section-label{font-size:13px;letter-spacing:0;color:var(--muted);font-weight:600;margin:24px 6px 8px;}
+.card{background:var(--surface);border-radius:18px;padding:16px;margin-bottom:10px;box-shadow:var(--shadow);}
+
+/* hero — white card, near-black type, blue progress accent */
+.hero{background:var(--surface);color:var(--ink);border-radius:22px;padding:22px;margin-bottom:12px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.hero::after{display:none;}
+.hero-top{display:flex;justify-content:space-between;align-items:flex-start;}
+.hero-date{font-size:13px;letter-spacing:0;color:var(--muted);font-weight:500;}
+.hero-city{font-family:var(--serif);font-size:30px;font-weight:700;line-height:1.04;margin-top:5px;letter-spacing:-.03em;}
+.hero-country{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);margin-top:8px;}
+.hero-weather{display:flex;flex-direction:column;align-items:flex-end;gap:3px;color:var(--accent);}
+.hero-temp{font-size:21px;font-weight:600;color:var(--ink);}
+.hero-temp span{font-size:13px;color:var(--muted);font-weight:400;margin-left:3px;}
+.hero-cond{font-size:14px;color:var(--ink2);margin-top:16px;}
+.weather-input{margin-top:12px;width:100%;background:var(--fill);color:var(--ink);border-radius:12px;padding:11px 13px;font-size:14px;font-family:var(--sans);}
+.weather-input::placeholder{color:var(--muted);}
+.weather-input:focus{outline:none;box-shadow:0 0 0 4px rgba(31,77,230,.12);}
+
+/* rows */
+.row-icon{display:flex;align-items:center;gap:8px;color:var(--ink);}
+.row-title{font-weight:600;font-size:15px;color:var(--ink);}
+.row-title.sm{font-size:14px;}
+.muted{color:var(--muted);} .sm{font-size:14px;line-height:1.45;} .xs{font-size:12.5px;line-height:1.4;color:var(--muted);}
+.reflink{display:inline-flex;align-items:center;gap:6px;margin-top:10px;background:var(--powder);color:var(--accent);border-radius:9px;padding:7px 11px;font-family:var(--mono);font-size:13px;font-weight:500;cursor:pointer;}
+.reflink.xs{font-size:12px;padding:5px 9px;margin-top:7px;}
+.empty{padding:4px 2px;}
+.pad{padding:28px 8px;text-align:center;}
+
+/* legs */
+.leg{display:flex;gap:13px;background:var(--surface);border-radius:16px;padding:15px;margin-bottom:9px;box-shadow:var(--shadow);}
+.leg.compact{background:transparent;box-shadow:none;padding:11px 0 0;border-radius:0;margin:0;}
+.leg-ic{width:34px;height:34px;flex:none;border-radius:9px;background:var(--fill);display:flex;align-items:center;justify-content:center;color:var(--accent);}
+.leg-body{flex:1;min-width:0;}
+.leg-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.leg-code,.vault-code{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent);background:none;display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:0;}
+.leg-route{font-size:14px;font-weight:500;margin-top:4px;}
+.mono{font-family:var(--mono);font-size:13px;color:var(--ink2);}
+
+/* checkrows — filled circle, no outline */
+.checkrow{display:flex;align-items:flex-start;gap:12px;width:100%;background:none;text-align:left;padding:11px 2px;cursor:pointer;}
+.checkrow.sm{padding:9px 0;}
+.box{width:23px;height:23px;flex:none;border-radius:50%;background:var(--fill2);display:flex;align-items:center;justify-content:center;color:#fff;margin-top:1px;transition:.18s cubic-bezier(.2,.8,.2,1);}
+.checkrow.checked .box{background:var(--accent);}
+.checkrow:active .box{transform:scale(.88);}
+.checktext{font-size:15px;line-height:1.4;transition:.15s;}
+.checkrow.checked .checktext{color:var(--muted);text-decoration:line-through;}
+.checkrow.pack{align-items:flex-start;}
+.packtext{display:flex;flex-direction:column;gap:2px;}
+.carry{display:inline-block;margin-left:8px;font-size:10px;font-weight:600;color:var(--accent);background:var(--powder);border-radius:5px;padding:1px 6px;vertical-align:middle;}
+
+/* quickadd */
+.quickadd{display:flex;gap:9px;margin-top:12px;}
+.quickadd input{flex:1;background:var(--fill);border-radius:12px;padding:11px 13px;font-size:14px;font-family:var(--sans);color:var(--ink);}
+.quickadd input:focus{outline:none;box-shadow:0 0 0 4px rgba(31,77,230,.12);}
+.quickadd button{width:42px;flex:none;background:var(--accent);color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s;}
+.quickadd button:active{background:var(--accent-d);transform:scale(.96);}
+
+/* stats */
+.ministats,.journal-stats{display:flex;gap:9px;margin-top:18px;}
+.stat{flex:1;background:var(--surface);border-radius:14px;padding:14px 8px;text-align:center;box-shadow:var(--shadow);}
+.stat-v{font-size:20px;font-weight:700;line-height:1;letter-spacing:-.02em;}
+.stat.accent .stat-v{color:var(--accent);}
+.stat-l{font-size:11px;letter-spacing:0;color:var(--muted);margin-top:6px;font-weight:500;}
+
+/* days */
+.daycard{background:var(--surface);border-radius:18px;margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow);animation:rise .4s both;}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.daycard.today{background:var(--powder);}
+.daycard-head{display:flex;align-items:center;gap:14px;width:100%;background:none;padding:15px;cursor:pointer;text-align:left;}
+.daycard-date{width:36px;flex:none;text-align:center;}
+.dc-dow{font-size:11px;letter-spacing:0;color:var(--muted);font-weight:500;}
+.dc-num{font-size:23px;font-weight:700;line-height:1;color:var(--ink);letter-spacing:-.02em;}
+.daycard-main{flex:1;min-width:0;}
+.dc-city{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;}
+.todaybadge,.split{font-size:10px;letter-spacing:0;background:var(--accent);color:#fff;border-radius:6px;padding:2px 7px;font-weight:600;}
+.dc-sub{display:flex;gap:12px;align-items:center;margin-top:5px;}
+.wchip{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink2);}
+.tzchip{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--muted);font-family:var(--mono);}
+.tzline{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink2);padding:6px 0 12px;}
+.tzline svg{color:var(--accent);flex:none;}
+.dc-leg{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--muted);font-family:var(--mono);}
+.chev{color:var(--muted);transition:transform .25s;}
+.chev.up{transform:rotate(180deg);}
+.daycard-body{padding:0 15px 15px;}
+.bodyrow{display:flex;gap:11px;padding:6px 0 12px;}
+.bodyrow svg{color:var(--accent);flex:none;margin-top:2px;}
+.inline-input{background:var(--fill);border-radius:10px;padding:9px 11px;font-size:14px;font-family:var(--sans);color:var(--ink);margin-top:6px;}
+.inline-input.full{width:100%;margin-bottom:8px;}
+.inline-input:focus{outline:none;box-shadow:0 0 0 4px rgba(31,77,230,.12);}
+
+/* spend */
+.bigtotal{background:var(--surface);color:var(--ink);border-radius:22px;padding:26px;text-align:center;margin-bottom:12px;box-shadow:var(--shadow);}
+.bigtotal-label{font-size:13px;letter-spacing:0;color:var(--accent);font-weight:600;}
+.bigtotal-num{font-size:46px;font-weight:700;line-height:1;margin:8px 0;letter-spacing:-.04em;}
+.bigtotal-sub{font-size:13px;color:var(--muted);}
+.addrow{display:flex;gap:9px;margin-bottom:9px;}
+.amt{flex:1;background:var(--fill);border-radius:12px;padding:13px;font-size:19px;font-weight:600;color:var(--ink);}
+.amt:focus,.sel:focus{outline:none;box-shadow:0 0 0 4px rgba(31,77,230,.12);}
+.sel{background:var(--fill);border-radius:12px;padding:0 12px;font-size:14px;font-family:var(--sans);color:var(--ink);font-weight:500;}
+.sel.full{width:100%;padding:13px;margin-bottom:9px;}
+.vintage{max-width:96px;}
+.primary{width:100%;background:var(--accent);color:#fff;border-radius:14px;padding:14px;font-size:15px;font-weight:600;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;margin-top:2px;transition:.12s;}
+.primary:active{background:var(--accent-d);transform:scale(.99);}
+.bar-row{margin-bottom:14px;}
+.bar-row:last-child{margin-bottom:0;}
+.bar-top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:7px;}
+.bar-val{font-family:var(--mono);color:var(--ink2);font-size:13px;}
+.bar-track{height:8px;background:var(--fill2);border-radius:8px;overflow:hidden;}
+.bar-fill{height:100%;background:var(--accent);border-radius:8px;transition:width .5s cubic-bezier(.2,.8,.2,1);}
+.bar-fill.green{background:var(--accent);}
+.fxtoggle{width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--fill);border-radius:12px;padding:13px 15px;font-size:14px;color:var(--ink2);font-family:var(--sans);font-weight:500;cursor:pointer;margin-bottom:10px;}
+.fx-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:14px;}
+.fx-edit{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);}
+.fx-input{width:70px;background:var(--fill);border-radius:8px;padding:7px 9px;font-family:var(--mono);font-size:14px;text-align:right;color:var(--ink);}
+.fx-input:focus{outline:none;box-shadow:0 0 0 4px rgba(31,77,230,.12);}
+.logrow{display:flex;align-items:center;gap:11px;background:var(--surface);border-radius:14px;padding:13px 15px;margin-bottom:8px;box-shadow:var(--shadow);}
+.logrow-main{flex:1;min-width:0;}
+.logrow-top{font-size:16px;font-weight:600;letter-spacing:-.01em;}
+.logrow-aud{font-size:12.5px;font-weight:400;color:var(--muted);margin-left:6px;}
+.del{background:none;color:var(--muted);cursor:pointer;padding:5px;flex:none;transition:.12s;}
+.del:active{color:var(--ink);transform:scale(.9);}
+
+/* journal */
+.best{display:flex;align-items:center;gap:10px;background:var(--powder);border-radius:14px;padding:13px 15px;font-size:14px;margin-bottom:12px;color:var(--ink);}
+.best svg{color:var(--accent);flex:none;}
+.typetabs,.subtabs{display:flex;gap:0;background:var(--fill);border-radius:12px;padding:3px;margin-bottom:14px;}
+.typetab{flex:1;background:transparent;border-radius:9px;padding:9px 4px;font-size:12px;font-family:var(--sans);color:var(--ink2);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-weight:500;transition:.15s;}
+.typetab.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600;}
+.ratepair{display:flex;flex-direction:column;gap:11px;margin:14px 0;}
+.raterow{display:flex;align-items:center;justify-content:space-between;}
+.rate-label{font-size:14px;color:var(--ink2);font-weight:500;}
+.stars{display:flex;gap:5px;}
+.starbtn{background:none;cursor:pointer;padding:1px;transition:.1s;}
+.starbtn:active{transform:scale(.85);}
+.jcard{display:flex;gap:13px;background:var(--surface);border-radius:16px;padding:15px;margin-bottom:9px;box-shadow:var(--shadow);}
+.jcard-icon{width:34px;height:34px;flex:none;border-radius:9px;background:var(--fill);display:flex;align-items:center;justify-content:center;}
+.jcard-body{flex:1;min-width:0;}
+.jcard-title{font-size:16.5px;font-weight:600;line-height:1.2;letter-spacing:-.01em;}
+.vint{font-family:var(--mono);font-size:13px;color:var(--muted);font-weight:400;}
+.jcard-note{font-size:14px;color:var(--ink2);margin-top:5px;line-height:1.45;}
+.jcard-rate{display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap;}
+.mini{display:flex;align-items:center;gap:3px;}
+.mini-l{font-size:11px;letter-spacing:0;color:var(--muted);margin-right:3px;font-weight:500;}
+
+/* kit */
+.subtabs{margin-bottom:16px;}
+.subtab{flex:1;background:transparent;border-radius:9px;padding:11px;font-size:14px;font-weight:500;font-family:var(--sans);color:var(--ink2);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:.15s;}
+.subtab.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600;}
+.packbar{margin-bottom:18px;}
+.packbar-top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px;font-weight:500;}
+.packbar-pct{font-weight:700;color:var(--accent);}
+.packgroup-h{font-size:13px;letter-spacing:0;color:var(--muted);font-weight:600;margin:18px 6px 8px;}
+.vault-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.vault-meta{display:flex;align-items:center;gap:10px;margin-top:6px;}
+.seatpill{font-family:var(--mono);font-size:12px;color:var(--accent);background:var(--powder);border-radius:7px;padding:4px 9px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+
+/* tabbar — frosted, no border */
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);box-shadow:0 -1px 0 rgba(0,0,0,.04);display:flex;z-index:30;padding:9px 4px calc(9px + env(safe-area-inset-bottom));}
+.tab{flex:1;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 2px;cursor:pointer;color:var(--muted);font-family:var(--sans);transition:.12s;}
+.tab span{font-size:10.5px;letter-spacing:0;font-weight:500;}
+.tab.active{color:var(--accent);}
+.tab:active{transform:scale(.93);}
+
+/* toast */
+.toast{position:fixed;bottom:92px;left:50%;transform:translateX(-50%);background:rgba(29,29,31,.92);backdrop-filter:blur(12px);color:#fff;font-size:14px;font-weight:500;padding:11px 20px;border-radius:14px;z-index:40;animation:rise .25s;box-shadow:var(--shadow-float);}
+input,select,textarea,button{font-family:inherit;}
+select{appearance:none;-webkit-appearance:none;}
+    `}</style>
+  );
+}
+
+const _root = createRoot(document.getElementById("root"));
+_root.render(<App />);
+
+</script>
+</body>
+</html>
