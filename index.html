@@ -32,7 +32,7 @@ import {
   Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, MapPin, Wine,
   UtensilsCrossed, Camera, Sparkles, Check, Plus, Copy, Trash2, Star,
   Luggage, Ticket, ChevronDown, Wallet, BookOpen, CalendarDays, X,
-  Bed, Globe, Pencil, Home, Clock
+  Bed, Globe, Pencil, Home, Clock, Compass, CalendarPlus, ShoppingBag
 } from "lucide-react";
 
 /* ============================== DATA ============================== */
@@ -94,7 +94,7 @@ const ITINERARY = [
     plan:["Latin Quarter wander","Hotel check-in from 16:00"] },
   { date:"2026-06-06", dow:"Sat", city:"Paris", disp:"Paris", country:"France", w:"Paris", ccy:"EUR",
     hotel:{ name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris", ref:"QA62N49RX" },
-    legs:[], plan:["Le Marais wander","L'As du Fallafel (lunch)","Le Village Saint-Paul (vintage arcade shops)","Du Pain et des Idées (patisserie)","Miller, Rue Saint-Honoré (jewellery)"] },
+    legs:[], plan:["Le Marais wander","Miller, Rue Saint-Honoré (jewellery)"] },
   { date:"2026-06-07", dow:"Sun", city:"Paris", disp:"Paris", country:"France", w:"Paris", ccy:"EUR",
     hotel:{ name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris", ref:"QA62N49RX" },
     legs:[], plan:["Musée du Louvre — tickets 11:00","Hôtel Dame des Arts (rooftop bar)"] },
@@ -133,81 +133,48 @@ const ITINERARY = [
     legs:[{kind:"flight", code:"MH251", route:"Arrive Sydney T1", time:"07:00", detail:"Customs & immigration"}], plan:["Home"] },
 ];
 
-const VAULT_FLIGHTS = [
-  { code:"MH122", route:"Sydney T1 → Kuala Lumpur T1", date:"Thu 4 Jun", time:"13:05 → 20:00", seats:"11H / 11K", note:"Economy" },
-  { code:"MH20",  route:"Kuala Lumpur T1 → Paris CDG T2", date:"Thu 4 → Fri 5 Jun", time:"23:40 → 06:55", seats:"12F / 12G", note:"" },
-  { code:"TGV INOUI 8572", route:"Paris Montparnasse → Bordeaux-St-Jean", date:"Mon 8 Jun", time:"10:05 → 12:14", seats:"374 / 375", note:"1st class · coach 3 upper deck" },
-  { code:"AF7435", route:"Bordeaux → Paris CDG", date:"Sat 13 Jun", time:"14:05 → 15:25", seats:"", note:"Hall B / Aérogare 2 Term F" },
-  { code:"AF1050", route:"Paris CDG → Copenhagen T3", date:"Sat 13 Jun", time:"16:50 → 18:45", seats:"", note:"" },
-  { code:"SK505",  route:"Copenhagen T3 → London Heathrow T2", date:"Wed 17 Jun", time:"15:00 → 16:00", seats:"", note:"SAS, op. by SAS Connect" },
-  { code:"MH1",    route:"London Heathrow T4 → Kuala Lumpur T1", date:"Sat 20 → Sun 21 Jun", time:"21:35 → 17:50", seats:"12F / 12G", note:"" },
-  { code:"MH251",  route:"Kuala Lumpur T1 → Sydney T1", date:"Sun 21 → Mon 22 Jun", time:"20:00 → 07:00", seats:"10H / 10K", note:"" },
-];
-
-const VAULT_HOTELS = [
-  { key:"paris", city:"Paris", name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris", ref:"QA62N49RX", dates:"5 → 8 Jun", fixed:true },
-  { key:"bordeaux", city:"Bordeaux", name:"", address:"", ref:"", dates:"8 → 13 Jun", fixed:false },
-  { key:"copenhagen", city:"Copenhagen", name:"", address:"", ref:"", dates:"13 → 17 Jun", fixed:false },
-  { key:"london", city:"London", name:"", address:"", ref:"", dates:"17 → 20 Jun", fixed:false },
-];
-
-const PACKING = [
-  { cat:"Clothes", items:[
-    {t:"Lightweight jacket / blazer", n:"Packable, water-resistant, neutral"},
-    {t:"Polos (2-3)", n:"Plain, neutral tones"},
-    {t:"Casual shirts (2-3)", n:"Linen / cotton, wrinkle-resistant"},
-    {t:"2× oxford shirts"}, {t:"2× linen shirts"},
-    {t:"Clean T-shirts", n:"Merino resists odour"},
-    {t:"Tailored trousers (1-2)", n:"Stretch wool"},
-    {t:"Chinos (1-2)", n:"Stone / navy / olive"},
-    {t:"Black Venroy shorts"}, {t:"New Zara shorts"}, {t:"Lulu shorts"}, {t:"Swim shorts"},
-    {t:"Tan PJ trousers"}, {t:"Sleeping clothes"},
-    {t:"Lightweight training set", n:"Doubles as loungewear"},
-    {t:"Exercise clothes ×3 sets"}, {t:"Green polo shirt"},
-    {t:"Undies & socks (16 days)"}, {t:"Laundry bag"},
-  ]},
-  { cat:"Shoes", items:[
-    {t:"Hoka black runners"},{t:"Brown loafers"},{t:"Black Belgian loafers"},{t:"Havaianas"},{t:"Morjas espadrilles"},
-  ]},
-  { cat:"Accessories", items:[
-    {t:"Caps / hats ×2"},{t:"Leather & silver watch"},{t:"Sunglasses + case"},{t:"Rope belt + leather belt"},
-  ]},
-  { cat:"Medications", items:[
-    {t:"Basic medication kit", n:"Paracetamol, ibuprofen, antihistamine, gastro; original packaging", c:true},
-    {t:"Scripts & supplements", n:"Dex, Vyvanse, B12, Vit D, Melatonin, Magnesium, hair", c:true},
-    {t:"Compeed blister plasters", n:"Mixed sizes — you'll walk a lot"},
-  ]},
-  { cat:"Toiletries", items:[
-    {t:"Moisturiser, tret, cleanser", n:"≤100ml, liquids bag"},
-    {t:"Nail clippers", n:"Mind scissor length"},
-    {t:"Toothbrush / floss"},{t:"Hairbrush"},{t:"Deodorant"},{t:"Hairspray + wax"},
-  ]},
-  { cat:"Electronics", items:[
-    {t:"Universal travel adaptor (USB-C)", n:"EU Type C/F · UK differs"},
-    {t:"Two-port USB-C charger", n:"GaN 35-65W"},
-    {t:"Power bank 10,000mAh", n:"Carry-on only, never checked", c:true},
-    {t:"Noise-cancelling headphones", n:"Charge pre-flight", c:true},
-    {t:"AirTags / trackers", n:"One in checked bag"},
-    {t:"Charging cables"},
-    {t:"Work laptop + mouse", c:true},
-    {t:"AirPods ×2 + wired headphones"},
-    {t:"Laptop charger"},
-    {t:"iPhone wall charger + 2 cables"},
-  ]},
-  { cat:"Documents", items:[
-    {t:"Passport", n:"6+ months validity", c:true},
-    {t:"Printed passport & insurance copies", n:"Separate from originals + cloud copy", c:true},
-    {t:"Travel insurance", n:"Harriet to confirm last year's policy is active"},
-    {t:"eSIM", n:"France, Denmark, England — install before flying"},
-    {t:"Wallet setup (cards / tickets)", n:"Train + flight apps · Flighty"},
-    {t:"Backup card stored separately", n:"Low / no FX-fee"},
-  ]},
-  { cat:"Work", items:[
-    {t:"OneDrive mobile access", n:"All file access working on mobile"},
-  ]},
-];
-
 /* ============================== HELPERS ============================== */
+
+/* ============================== EXPLORE DATA ============================== */
+
+const VIBES = ["Fancy dinner","Long lunch","Quick bite","Coffee & cake","Wine bar","Cheap & cheerful","Sweet treat","Must-see","Hidden gem","Golden hour","Browse & buy"];
+const CATS = ["Eat & Drink","See & Do","Shop"];
+const CAT_ICON = { "Eat & Drink": UtensilsCrossed, "See & Do": Camera, "Shop": ShoppingBag };
+const EXPLORE_CITIES = ["Paris","Bordeaux","Copenhagen","London"];
+
+const SEED_PLACES = [
+  { id:"bambino", city:"Paris", cat:"Eat & Drink", tag:"Wine bar", name:"Bambino", area:"11th arr. \u00b7 rue Saint-S\u00e9bastien", note:"Natural wine and open-fire small plates in a vinyl-lined room; gets clubby late. Kitchen to 11pm, wine to 2am." },
+  { id:"lasdufallafel", city:"Paris", cat:"Eat & Drink", tag:"Quick bite", name:"L'As du Fallafel", area:"Le Marais \u00b7 rue des Rosiers", note:"The Marais falafel institution. Expect a queue, get the special.", defaultDay:2 },
+  { id:"berthillon", city:"Paris", cat:"Eat & Drink", tag:"Sweet treat", name:"Berthillon", area:"\u00cele Saint-Louis (4th)", note:"Paris's benchmark ice cream since 1954. Salted caramel and the fruit sorbets are the move." },
+  { id:"villagestpaul", city:"Paris", cat:"Shop", tag:"Browse & buy", name:"Le Village Saint-Paul", area:"Le Marais (4th)", note:"Cluster of antique, vintage and design courtyards tucked off the street.", defaultDay:2 },
+  { id:"dupainetdesidees", city:"Paris", cat:"Eat & Drink", tag:"Coffee & cake", name:"Du Pain et des Id\u00e9es", area:"10th arr. \u00b7 rue Yves Toudic", note:"Beautiful old-world bakery. Pain des amis and the pistachio-chocolate escargot. Closed weekends, so Friday is your window.", defaultDay:1 },
+  { id:"racines", city:"Paris", cat:"Eat & Drink", tag:"Long lunch", name:"Racines", area:"2nd arr. \u00b7 Passage des Panoramas", note:"Sardinian-Italian bistro in a historic covered passage. Vitello tonnato, handmade pasta, natural wine." },
+  { id:"baillardran", city:"Bordeaux", cat:"Eat & Drink", tag:"Sweet treat", name:"Baillardran", area:"Several shops \u00b7 incl. Gare St-Jean", note:"Bordeaux's famous canel\u00e9 maker since 1988: caramel shell, custard centre. There's a counter at Gare St-Jean, where your train arrives." },
+];
+
+function mergedPlaces(state) {
+  const added = (state.exploreAdded || []);
+  return [...SEED_PLACES, ...added].map(p => {
+    const st = (state.exploreStatus && state.exploreStatus[p.id]) || {};
+    const plannedDay = ("plannedDay" in st) ? st.plannedDay : (p.defaultDay != null ? p.defaultDay : null);
+    return { ...p, plannedDay, been: !!st.been, rated: !!st.rated };
+  });
+}
+function questionFor(p) {
+  if (p.cat === "See & Do") return `${p.name}. Glad you went?`;
+  if (p.cat === "Shop") return `Find anything at ${p.name}?`;
+  if (p.tag === "Wine bar") return `What were you drinking at ${p.name}?`;
+  if (p.tag === "Sweet treat" || p.tag === "Coffee & cake") return `How was ${p.name}?`;
+  if (p.tag === "Fancy dinner") return `${p.name}. Worth the bill?`;
+  if (p.tag === "Quick bite") return `${p.name}. Quick and good?`;
+  return `How was ${p.name}?`;
+}
+function typeForPlace(p) {
+  if (p.cat === "See & Do") return "Sight";
+  if (p.cat === "Shop") return "Moment";
+  if (p.tag === "Wine bar") return "Wine";
+  return "Meal";
+}
 
 const STORE_KEY = "euro26:v1";
 
@@ -215,10 +182,7 @@ const STORE_KEY = "euro26:v1";
    Per-device by default (localStorage). To SHARE one synced dataset between
    both phones: create a free bin at jsonbin.io and paste its Bin ID and
    X-Master-Key below. Leave blank to keep each phone separate. */
-const SYNC = {
-  binId: "",      // <-- paste JSONBin Bin ID here to enable sharing
-  masterKey: "",  // <-- paste JSONBin X-Master-Key here
-};
+const SYNC = { binId: "", masterKey: "" };
 const syncEnabled = () => Boolean(SYNC.binId && SYNC.masterKey);
 const store = {
   syncEnabled,
@@ -229,7 +193,7 @@ const store = {
           headers: { "X-Master-Key": SYNC.masterKey, "X-Bin-Meta": "false" },
         });
         if (r.ok) return await r.json();
-      } catch (e) { /* fall back to local */ }
+      } catch (e) {}
     }
     try { const v = localStorage.getItem(STORE_KEY); return v ? JSON.parse(v) : null; }
     catch (e) { return null; }
@@ -243,7 +207,7 @@ const store = {
           headers: { "Content-Type": "application/json", "X-Master-Key": SYNC.masterKey },
           body: JSON.stringify(data),
         });
-      } catch (e) { /* keep local copy */ }
+      } catch (e) {}
     }
   },
 };
@@ -285,7 +249,7 @@ function App() {
 
   const [state, setState] = useState({
     weather: {}, planDone: {}, planAdd: {}, spend: [], journal: [],
-    packing: {}, fx: { ...DEFAULT_FX }, hotels: {},
+    packing: {}, fx: { ...DEFAULT_FX }, hotels: {}, exploreStatus: {}, exploreAdded: [],
   });
 
   // load
@@ -316,20 +280,6 @@ function App() {
     return () => clearTimeout(h);
   }, [state, loaded]);
 
-  // pull latest when the app regains focus (only while sharing is on)
-  useEffect(() => {
-    if (!loaded || !store.syncEnabled()) return;
-    const onVis = async () => {
-      if (document.visibilityState !== "visible") return;
-      const remote = await store.get();
-      if (remote && typeof remote === "object") {
-        setState(s => ({ ...s, ...remote, fx: { ...DEFAULT_FX, ...(remote.fx || {}) } }));
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [loaded]);
-
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 1600); };
   const copy = (txt, label) => {
     try { navigator.clipboard.writeText(txt); flash((label || "Copied") + " copied"); }
@@ -345,7 +295,7 @@ function App() {
   const bestMeal = [...state.journal].filter(j => j.type === "Meal")
     .sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
 
-  const ctx = { state, setState, fx, tIndex, copy, flash, uid };
+  const ctx = { state, setState, fx, tIndex, copy, flash, uid, setTab };
 
   return (
     <div className="app">
@@ -372,7 +322,7 @@ function App() {
         {tab === "days"    && <Days {...ctx} />}
         {tab === "spend"   && <Spend {...ctx} spendAUD={spendAUD} />}
         {tab === "journal" && <Journal {...ctx} stats={{ wines, meals, rated, bestMeal, spendAUD }} />}
-        {tab === "kit"     && <Kit {...ctx} />}
+        {tab === "explore" && <Explore {...ctx} />}
       </main>
 
       {toast && <div className="toast">{toast}</div>}
@@ -383,7 +333,7 @@ function App() {
           { id:"days", label:"Days", Icon:CalendarDays },
           { id:"spend", label:"Spend", Icon:Wallet },
           { id:"journal", label:"Journal", Icon:BookOpen },
-          { id:"kit", label:"Kit", Icon:Luggage },
+          { id:"explore", label:"Explore", Icon:Compass },
         ].map(({ id, label, Icon }) => (
           <button key={id} className={"tab" + (tab === id ? " active" : "")} onClick={() => setTab(id)}>
             <Icon size={20} strokeWidth={tab === id ? 2.2 : 1.7} />
@@ -397,10 +347,12 @@ function App() {
 
 /* ============================== TODAY ============================== */
 
-function Today({ state, setState, fx, tIndex, copy }) {
+function Today({ state, setState, fx, tIndex, copy, setTab }) {
   const d = ITINERARY[tIndex];
   const clim = CLIMATE[d.w];
   const wOverride = state.weather[tIndex] || "";
+  const toRate = mergedPlaces(state).filter(p => p.been && !p.rated).length;
+  const exploreToday = mergedPlaces(state).filter(p => p.plannedDay === tIndex);
 
   const spendAUD = state.spend.reduce((a, e) => a + e.amount * (fx[e.ccy] || 1), 0);
   const todaySpend = state.spend.filter(e => e.day === tIndex)
@@ -430,6 +382,12 @@ function Today({ state, setState, fx, tIndex, copy }) {
           value={wOverride} onChange={e => setState(s => ({ ...s, weather: { ...s.weather, [tIndex]: e.target.value } }))} />
       </div>
 
+      {toRate > 0 && (
+        <button className="nudge" onClick={() => setTab("journal")}>
+          <BookOpen size={15} /> {toRate} {toRate === 1 ? "place" : "places"} to rate in your journal
+        </button>
+      )}
+
       {d.hotel && (d.hotel.address || d.hotel.note) && (
         <Card>
           <div className="row-icon"><Bed size={16} /><span className="row-title">{d.hotel.name}</span></div>
@@ -447,11 +405,17 @@ function Today({ state, setState, fx, tIndex, copy }) {
 
       <div className="section-label">Plan</div>
       <Card>
-        {planItems.length === 0 && <div className="muted sm empty">Nothing locked in. Add something below as the day unfolds.</div>}
+        {planItems.length === 0 && exploreToday.length === 0 && <div className="muted sm empty">Nothing locked in. Add something below as the day unfolds.</div>}
         {planItems.map(p => (
           <button key={p.id} className={"checkrow" + (done[p.id] ? " checked" : "")} onClick={() => toggle(p.id)}>
             <span className="box">{done[p.id] && <Check size={13} strokeWidth={3} />}</span>
             <span className="checktext">{p.t}</span>
+          </button>
+        ))}
+        {exploreToday.map(p => (
+          <button key={p.id} className={"checkrow" + (p.been ? " checked" : "")} onClick={() => setState(s => ({ ...s, exploreStatus: { ...s.exploreStatus, [p.id]: { ...(s.exploreStatus[p.id] || {}), been: !p.been } } }))}>
+            <span className="box">{p.been && <Check size={13} strokeWidth={3} />}</span>
+            <span className="checktext">{p.name}<span className="vibetag inline">{p.tag}</span></span>
           </button>
         ))}
         <QuickAdd placeholder="Add to today…" onAdd={(t) => setState(s => ({ ...s, planAdd: { ...s.planAdd, [tIndex]: [ ...(s.planAdd[tIndex] || []), { id: uid(), t } ] } }))} />
@@ -482,6 +446,7 @@ function Days({ state, setState, tIndex, copy }) {
         const isToday = i === tIndex;
         const planItems = (d.plan || []).map((t, j) => ({ id: `d${i}-p${j}`, t })).concat((state.planAdd[i] || []));
         const done = state.planDone[i] || {};
+        const exploreDay = mergedPlaces(state).filter(p => p.plannedDay === i);
         return (
           <div key={i} className={"daycard" + (isToday ? " today" : "")} style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}>
             <button className="daycard-head" onClick={() => toggleOpen(i)}>
@@ -522,6 +487,13 @@ function Days({ state, setState, tIndex, copy }) {
                     onClick={() => setState(s => ({ ...s, planDone: { ...s.planDone, [i]: { ...(s.planDone[i] || {}), [p.id]: !(s.planDone[i] || {})[p.id] } } }))}>
                     <span className="box">{done[p.id] && <Check size={12} strokeWidth={3} />}</span>
                     <span className="checktext">{p.t}</span>
+                  </button>
+                ))}
+                {exploreDay.map(p => (
+                  <button key={p.id} className={"checkrow sm" + (p.been ? " checked" : "")}
+                    onClick={() => setState(s => ({ ...s, exploreStatus: { ...s.exploreStatus, [p.id]: { ...(s.exploreStatus[p.id] || {}), been: !p.been } } }))}>
+                    <span className="box">{p.been && <Check size={12} strokeWidth={3} />}</span>
+                    <span className="checktext">{p.name}<span className="vibetag inline">{p.tag}</span></span>
                   </button>
                 ))}
                 <QuickAdd placeholder="Add a stop…" onAdd={(t) => setState(s => ({ ...s, planAdd: { ...s.planAdd, [i]: [ ...(s.planAdd[i] || []), { id: uid(), t } ] } }))} />
@@ -651,6 +623,7 @@ function Journal({ state, setState, fx, tIndex, stats }) {
   const del = (id) => setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== id) }));
 
   const avg = (k) => stats.rated.length ? (stats.rated.reduce((a, j) => a + j[k], 0) / stats.rated.length).toFixed(1) : "–";
+  const toRate = mergedPlaces(state).filter(p => p.been && !p.rated);
 
   return (
     <div className="page">
@@ -667,6 +640,13 @@ function Journal({ state, setState, fx, tIndex, stats }) {
         <div className="best">
           <Sparkles size={14} /><span>Best meal so far — <strong>{stats.bestMeal.title}</strong> ({stats.bestMeal.city})</span>
         </div>
+      )}
+
+      {toRate.length > 0 && (
+        <>
+          <div className="section-label">Still to rate</div>
+          {toRate.map(p => <RatePrompt key={p.id} place={p} setState={setState} tIndex={tIndex} />)}
+        </>
       )}
 
       <Card>
@@ -716,97 +696,139 @@ function Journal({ state, setState, fx, tIndex, stats }) {
   );
 }
 
-/* ============================== KIT ============================== */
+/* ============================== EXPLORE ============================== */
 
-function Kit({ state, setState, copy }) {
-  const [sub, setSub] = useState("pack");
+function Explore({ state, setState, tIndex, setTab }) {
+  const here = ITINERARY[tIndex].city;
+  const startCity = EXPLORE_CITIES.includes(here) ? here : "Paris";
+  const [city, setCity] = useState(startCity);
+  const [vibe, setVibe] = useState("All");
+  const [picker, setPicker] = useState(null);
+  const [adding, setAdding] = useState(false);
+
+  const places = mergedPlaces(state).filter(p => p.city === city);
+  const vibesHere = ["All", ...Array.from(new Set(places.map(p => p.tag)))];
+  const shown = vibe === "All" ? places : places.filter(p => p.tag === vibe);
+  const doneCount = places.filter(p => p.been).length;
+  const cityDays = ITINERARY.map((d, i) => ({ i, d })).filter(x => x.d.city === city);
+  const byCat = CATS.map(cat => ({ cat, items: shown.filter(p => p.cat === cat) })).filter(g => g.items.length);
+
+  const setStatus = (id, patch) => setState(s => ({ ...s, exploreStatus: { ...s.exploreStatus, [id]: { ...(s.exploreStatus[id] || {}), ...patch } } }));
+
   return (
     <div className="page">
-      <div className="page-h">Kit</div>
-      <div className="subtabs">
-        <button className={"subtab" + (sub === "pack" ? " on" : "")} onClick={() => setSub("pack")}><Luggage size={15} /> Packing</button>
-        <button className={"subtab" + (sub === "vault" ? " on" : "")} onClick={() => setSub("vault")}><Ticket size={15} /> Vault</button>
+      <div className="page-h">Explore</div>
+
+      <div className="citytabs">
+        {EXPLORE_CITIES.map(c => (
+          <button key={c} className={"citytab" + (city === c ? " on" : "")} onClick={() => { setCity(c); setVibe("All"); setPicker(null); }}>{c}</button>
+        ))}
       </div>
-      {sub === "pack" ? <Packing state={state} setState={setState} /> : <Vault state={state} setState={setState} copy={copy} />}
+      <div className="city-meta">{doneCount} of {places.length} done in {city}</div>
+
+      <div className="vibebar">
+        {vibesHere.map(v => (
+          <button key={v} className={"vibechip" + (vibe === v ? " on" : "")} onClick={() => setVibe(v)}>{v}</button>
+        ))}
+      </div>
+
+      {byCat.length === 0 && <div className="muted sm empty pad">No ideas here yet. Add one below.</div>}
+
+      {byCat.map(g => (
+        <div key={g.cat}>
+          <div className="section-label">{g.cat}</div>
+          {g.items.map(p => {
+            const planned = p.plannedDay != null;
+            const day = planned ? ITINERARY[p.plannedDay] : null;
+            return (
+              <div key={p.id} className={"placecard" + (p.been ? " been" : "")}>
+                <button className="placecheck" onClick={() => setStatus(p.id, { been: !p.been })}>
+                  <span className="box">{p.been && <Check size={13} strokeWidth={3} />}</span>
+                </button>
+                <div className="place-body">
+                  <div className="place-top">
+                    <span className="place-name">{p.name}</span>
+                    <span className="vibetag">{p.tag}</span>
+                  </div>
+                  {(p.area || p.note) && <div className="muted xs">{[p.area, p.note].filter(Boolean).join(" · ")}</div>}
+                  <div className="place-actions">
+                    {planned
+                      ? <button className="planpill" onClick={() => setPicker(picker === p.id ? null : p.id)}><CalendarDays size={12} /> {day.dow} {fmtDate(day.date)}</button>
+                      : <button className="addday" onClick={() => setPicker(picker === p.id ? null : p.id)}><CalendarPlus size={13} /> Add to a day</button>}
+                  </div>
+                  {picker === p.id && (
+                    <div className="daypicker">
+                      {cityDays.map(({ i, d }) => (
+                        <button key={i} className={"dpbtn" + (p.plannedDay === i ? " on" : "")} onClick={() => { setStatus(p.id, { plannedDay: i }); setPicker(null); }}>{d.dow} {fmtDate(d.date)}</button>
+                      ))}
+                      {planned && <button className="dpbtn clear" onClick={() => { setStatus(p.id, { plannedDay: null }); setPicker(null); }}>Remove</button>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {adding
+        ? <AddPlace city={city} onCancel={() => setAdding(false)} onAdd={(place) => { setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), place ] })); setAdding(false); }} />
+        : <button className="addplace" onClick={() => setAdding(true)}><Plus size={16} /> Add a place</button>}
     </div>
   );
 }
 
-function Packing({ state, setState }) {
-  const allIds = PACKING.flatMap((g, gi) => g.items.map((_, ii) => `${gi}-${ii}`));
-  const doneCount = allIds.filter(id => state.packing[id]).length;
-  const pct = Math.round((doneCount / allIds.length) * 100);
-  const toggle = (id) => setState(s => ({ ...s, packing: { ...s.packing, [id]: !s.packing[id] } }));
-
+function AddPlace({ city, onAdd, onCancel }) {
+  const [name, setName] = useState("");
+  const [cat, setCat] = useState("Eat & Drink");
+  const [tag, setTag] = useState(VIBES[0]);
+  const [area, setArea] = useState("");
+  const [note, setNote] = useState("");
+  const go = () => {
+    if (!name.trim()) return;
+    onAdd({ id: uid(), city, cat, tag, name: name.trim(), area: area.trim(), note: note.trim() });
+  };
   return (
-    <>
-      <div className="packbar">
-        <div className="packbar-top"><span>{doneCount} / {allIds.length} packed</span><span className="packbar-pct">{pct}%</span></div>
-        <div className="bar-track"><div className="bar-fill green" style={{ width: `${pct}%` }} /></div>
+    <Card>
+      <input className="inline-input full" placeholder="Place name…" value={name} onChange={e => setName(e.target.value)} />
+      <select className="sel full" value={cat} onChange={e => setCat(e.target.value)}>
+        {CATS.map(c => <option key={c}>{c}</option>)}
+      </select>
+      <select className="sel full" value={tag} onChange={e => setTag(e.target.value)}>
+        {VIBES.map(v => <option key={v}>{v}</option>)}
+      </select>
+      <input className="inline-input full" placeholder="Area / neighbourhood (optional)" value={area} onChange={e => setArea(e.target.value)} />
+      <input className="inline-input full" placeholder="Note (optional)" value={note} onChange={e => setNote(e.target.value)} />
+      <div className="btnrow">
+        <button className="primary grow" onClick={go}><Plus size={15} /> Add to {city}</button>
+        <button className="ghostbtn" onClick={onCancel}>Cancel</button>
       </div>
-      {PACKING.map((g, gi) => (
-        <div key={gi} className="packgroup">
-          <div className="packgroup-h">{g.cat}</div>
-          <Card>
-            {g.items.map((it, ii) => {
-              const id = `${gi}-${ii}`;
-              return (
-                <button key={id} className={"checkrow pack" + (state.packing[id] ? " checked" : "")} onClick={() => toggle(id)}>
-                  <span className="box">{state.packing[id] && <Check size={12} strokeWidth={3} />}</span>
-                  <span className="packtext">
-                    <span className="checktext">{it.t}{it.c && <span className="carry">carry-on</span>}</span>
-                    {it.n && <span className="muted xs">{it.n}</span>}
-                  </span>
-                </button>
-              );
-            })}
-          </Card>
-        </div>
-      ))}
-    </>
+    </Card>
   );
 }
 
-function Vault({ state, setState, copy }) {
+function RatePrompt({ place, setState, tIndex }) {
+  const [you, setYou] = useState(0);
+  const [her, setHer] = useState(0);
+  const [note, setNote] = useState("");
+  const save = () => {
+    const day = place.plannedDay != null ? place.plannedDay : tIndex;
+    setState(s => ({
+      ...s,
+      journal: [{ id: uid(), type: typeForPlace(place), title: place.name, note: note.trim(), you, her, region: "", vintage: "", city: place.city, day, ts: Date.now() }, ...s.journal],
+      exploreStatus: { ...s.exploreStatus, [place.id]: { ...(s.exploreStatus[place.id] || {}), rated: true } },
+    }));
+  };
   return (
-    <>
-      <div className="section-label">Flights & rail</div>
-      {VAULT_FLIGHTS.map((f, i) => (
-        <Card key={i}>
-          <div className="vault-head">
-            <button className="vault-code" onClick={() => copy(f.code, f.code)}>{f.code} <Copy size={12} /></button>
-            <span className="muted xs">{f.date}</span>
-          </div>
-          <div className="row-title sm">{f.route}</div>
-          <div className="vault-meta">
-            <span className="mono">{f.time}</span>
-            {f.seats && <button className="seatpill" onClick={() => copy(f.seats, "Seats")}>{f.seats} <Copy size={11} /></button>}
-          </div>
-          {f.note && <div className="muted xs">{f.note}</div>}
-        </Card>
-      ))}
-
-      <div className="section-label">Accommodation</div>
-      {VAULT_HOTELS.map(h => (
-        <Card key={h.key}>
-          <div className="vault-head"><span className="row-title sm">{h.city}</span><span className="muted xs">{h.dates}</span></div>
-          {h.fixed ? (
-            <>
-              <div className="sm">{h.name}</div>
-              <div className="muted xs">{h.address}</div>
-              <button className="reflink" onClick={() => copy(h.ref, "Booking ref")}><span>{h.ref}</span><Copy size={13} /></button>
-            </>
-          ) : (
-            <>
-              <input className="inline-input full" placeholder="Hotel name…" value={state.hotels[h.key] || ""}
-                onChange={e => setState(s => ({ ...s, hotels: { ...s.hotels, [h.key]: e.target.value } }))} />
-              <input className="inline-input full" placeholder="Address / booking ref…" value={state.hotels[h.key + "_d"] || ""}
-                onChange={e => setState(s => ({ ...s, hotels: { ...s.hotels, [h.key + "_d"]: e.target.value } }))} />
-            </>
-          )}
-        </Card>
-      ))}
-    </>
+    <Card>
+      <div className="prompt-q">{questionFor(place)}</div>
+      <div className="ratepair">
+        <RateRow label="You" value={you} onChange={setYou} />
+        <RateRow label="Harriet" value={her} onChange={setHer} />
+      </div>
+      <input className="inline-input full" placeholder="A line on it (optional)…" value={note} onChange={e => setNote(e.target.value)} />
+      <button className="primary" onClick={save}><Check size={15} /> Save to journal</button>
+    </Card>
   );
 }
 
@@ -1086,6 +1108,38 @@ function Style() {
 
 /* toast */
 .toast{position:fixed;bottom:92px;left:50%;transform:translateX(-50%);background:rgba(29,29,31,.92);backdrop-filter:blur(12px);color:#fff;font-size:14px;font-weight:500;padding:11px 20px;border-radius:14px;z-index:40;animation:rise .25s;box-shadow:var(--shadow-float);}
+/* explore */
+.citytabs{display:flex;gap:0;background:var(--fill);border-radius:12px;padding:3px;margin-bottom:10px;}
+.citytab{flex:1;background:transparent;border-radius:9px;padding:9px 4px;font-size:13px;font-weight:500;color:var(--ink2);cursor:pointer;transition:.15s;font-family:var(--sans);}
+.citytab.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600;}
+.city-meta{font-size:12.5px;color:var(--muted);margin:0 6px 14px;}
+.vibebar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;}
+.vibechip{flex:none;background:var(--fill);color:var(--ink2);border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;transition:.15s;font-family:var(--sans);}
+.vibechip.on{background:var(--accent);color:#fff;}
+.placecard{display:flex;gap:11px;background:var(--surface);border-radius:14px;padding:14px;margin-bottom:9px;box-shadow:var(--shadow);transition:.15s;}
+.placecard.been{background:var(--powder);}
+.placecheck{background:none;padding:0;cursor:pointer;flex:none;margin-top:1px;}
+.placecheck:active .box{transform:scale(.88);}
+.place-body{flex:1;min-width:0;}
+.place-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.place-name{font-size:15.5px;font-weight:600;letter-spacing:-.01em;}
+.vibetag{flex:none;background:var(--powder);color:var(--accent);border-radius:999px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;}
+.vibetag.inline{margin-left:8px;padding:1px 8px;font-size:10px;vertical-align:middle;}
+.place-actions{margin-top:10px;}
+.addday,.planpill{display:inline-flex;align-items:center;gap:6px;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}
+.addday{background:var(--accent);color:#fff;}
+.addday:active{background:var(--accent-d);}
+.planpill{background:var(--fill);color:var(--ink);}
+.daypicker{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px;}
+.dpbtn{background:var(--fill);color:var(--ink);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:var(--sans);}
+.dpbtn.on{background:var(--accent);color:#fff;}
+.dpbtn.clear{background:transparent;color:var(--muted);}
+.addplace{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--fill);color:var(--ink);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:6px;}
+.btnrow{display:flex;gap:8px;}
+.primary.grow{width:auto;flex:1;}
+.ghostbtn{background:var(--fill);color:var(--ink2);border-radius:14px;padding:13px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);flex:none;}
+.nudge{width:100%;display:flex;align-items:center;gap:9px;background:var(--powder);color:var(--accent);border-radius:14px;padding:13px 15px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-bottom:12px;}
+.prompt-q{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:-.01em;margin-bottom:10px;}
 input,select,textarea,button{font-family:inherit;}
 select{appearance:none;-webkit-appearance:none;}
     `}</style>
