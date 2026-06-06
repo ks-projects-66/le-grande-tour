@@ -403,7 +403,7 @@ if (!authChecked) return <div className="app"><Style /></div>;
 if (!session && !viewerMode) return <div className="app"><Style /><AuthScreen onView={() => setViewerMode(true)} /></div>;
 
 return (
-<div className="app">
+<div className="app" data-edit={canEdit ? "1" : "0"}>
 <Style />
 <header className="topbar">
 <div className="topbar-row">
@@ -419,7 +419,7 @@ return (
 <div className="progress"><div className="progress-fill" style={{ width: `${((tIndex + 1) / TRIP.total) * 100}%` }} /></div>
 <div className="syncrow">
 <span className={"syncnote" + (!online ? " warn" : "")}>
-{!online ? "offline — changes paused" : session ? "Signed in · shared trip sync on" : "Viewing shared trip"}
+{!online ? "offline — changes paused" : session ? "Signed in · shared trip sync on" : "Viewer mode · sign in to edit"}
 </span>
 {session
 ? <button className="signout" onClick={signOut}><LogOut size={12} /> Sign out</button>
@@ -494,11 +494,13 @@ return (
 </div>
 </div>
 <div className="hero-cond">{wOverride || `${clim.cond} · ${clim.rain}`}</div>
+{canEdit && (
 <input className="weather-input" placeholder="Tap to set today's real forecast…"
 value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather, [tIndex]: e.target.value } }))} />
+)}
 </div>
 
-{toRate > 0 && (
+{toRate > 0 && canEdit && (
 <button className="nudge" onClick={() => setTab("journal")}>
 <BookOpen size={15} /> {toRate} {toRate === 1 ? "place" : "places"} to rate in your journal
 </button>
@@ -532,7 +534,9 @@ value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather,
 <span className="checktext">{p.name}<span className="vibetag inline">{p.tag}</span></span>
 </button>
 ))}
+{canEdit && (
 <QuickAdd placeholder="Add to today…" onAdd={(t) => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [tIndex]: [ ...(s.planAdd[tIndex] || []), { id: uid(), t } ] } }))} />
+)}
 </Card>
 
 <div className="ministats">
@@ -609,7 +613,9 @@ onClick={() => setStatus(p.id, { been: !p.been })}>
 <span className="checktext">{p.name}<span className="vibetag inline">{p.tag}</span></span>
 </button>
 ))}
+{canEdit && (
 <QuickAdd placeholder="Add a stop…" onAdd={(t) => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [i]: [ ...(s.planAdd[i] || []), { id: uid(), t } ] } }))} />
+)}
 </div>
 )}
 </div>
@@ -681,6 +687,7 @@ return (
 </>
 )}
 
+{canEdit && (
 <Card>
 <div className="typetabs">
 {Object.keys(TYPE_META).map(tp => {
@@ -703,6 +710,7 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} onCli
 </div>
 <button className="primary" onClick={add} disabled={busy}><Plus size={15} /> {busy ? "Saving…" : "Add entry"}</button>
 </Card>
+)}
 
 {state.journal.map(j => {
 const Ic = TYPE_META[j.type].icon;
@@ -797,9 +805,9 @@ return (
 })}
 </div>
 ))}
-{adding
+{canEdit && (adding
 ? <AddPlace city={city} onCancel={() => setAdding(false)} onAdd={addPlace} />
-: <button className="addplace" onClick={() => setAdding(true)}><Plus size={16} /> Add a place</button>}
+: <button className="addplace" onClick={() => setAdding(true)}><Plus size={16} /> Add a place</button>)}
 </div>
 );
 }
@@ -1082,6 +1090,12 @@ return (
 .viewerbtn{background:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:14px;padding:6px;}
 .authnote{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.4;}
 input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit-appearance:none;}
+/* viewer read-only mode */
+.app[data-edit="0"] .addday{display:none !important;}
+.app[data-edit="0"] .daypicker{display:none !important;}
+.app[data-edit="0"] .placecheck{pointer-events:none;}
+.app[data-edit="0"] .planpill{pointer-events:none;}
+.app[data-edit="0"] .raterow,.app[data-edit="0"] .stars{pointer-events:none;}
 `}</style>
 );
 }
