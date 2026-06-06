@@ -551,7 +551,7 @@ value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather,
 /* ============================== DAYS ============================== */
 
 function Days(ctx) {
-const { state, setLocal, tIndex, copy } = ctx;
+const { state, setLocal, tIndex, copy, canEdit } = ctx;
 const setStatus = useSetStatus(ctx);
 const [open, setOpen] = useState({ [tIndex]: true });
 const toggleOpen = (i) => setOpen(o => ({ ...o, [i]: !o[i] }));
