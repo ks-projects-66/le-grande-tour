@@ -33,7 +33,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
 Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
 Camera, Sparkles, Check, Plus, Copy, Trash2, Star, ChevronDown, BookOpen,
-CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut
+CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote
 } from "lucide-react";
 
 /* ============================== SUPABASE ============================== */
@@ -79,56 +79,47 @@ return `${tz.z} (${tz.utc}) · Sydney is ${tz.ahead}h ahead`;
 }
 
 const ITINERARY = [
-{ date:"2026-06-04", dow:"Thu", city:"Transit", disp:"Sydney → Kuala Lumpur", country:null, w:"SydKL",
-hotel:{ name:"Overnight flight", note:"In the air" },
-legs:[
-{kind:"flight", code:"MH122", route:"Sydney T1 → Kuala Lumpur T1", time:"13:05 → 20:00", detail:"Economy · seats 11H / 11K"},
-{kind:"flight", code:"MH20", route:"Kuala Lumpur T1 → Paris CDG T2", time:"23:40 → 06:55 (+1)", detail:"Seats 12F / 12G"},
-], plan:[] },
+{ date:"2026-06-04", dow:"Thu", city:"Transit", disp:"Sydney → Kuala Lumpur", country:null, w:"SydKL", plan:[] },
 { date:"2026-06-05", dow:"Fri", city:"Paris", disp:"Paris", country:"France", w:"Paris",
-hotel:{ name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris (Latin Quarter, 5th arr.)", ref:"QA62N49RX", checkin:"Check-in from 16:00" },
-legs:[{kind:"flight", code:"MH20", route:"Arrive Paris CDG T2", time:"06:55", detail:"Customs & immigration, then to hotel"}],
-plan:["Latin Quarter wander","Hotel check-in from 16:00"] },
+plan:["Latin Quarter wander"] },
 { date:"2026-06-06", dow:"Sat", city:"Paris", disp:"Paris", country:"France", w:"Paris",
-hotel:{ name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris", ref:"QA62N49RX" },
-legs:[], plan:["Le Marais wander","Miller, Rue Saint-Honoré (jewellery)"] },
+plan:["Le Marais wander","Miller, Rue Saint-Honoré (jewellery)"] },
 { date:"2026-06-07", dow:"Sun", city:"Paris", disp:"Paris", country:"France", w:"Paris",
-hotel:{ name:"Le Jardin de Verre by Locke", address:"7 rue Lacépède, 75005 Paris", ref:"QA62N49RX" },
-legs:[], plan:["Musée du Louvre — tickets 11:00","Hôtel Dame des Arts (rooftop bar)"] },
+plan:["Musée du Louvre — tickets 11:00","Hôtel Dame des Arts (rooftop bar)"] },
 { date:"2026-06-08", dow:"Mon", city:"Bordeaux", disp:"Paris → Bordeaux", country:"France", w:"Bordeaux",
-hotel:{ name:"Bordeaux stay", editKey:"bordeaux" },
-legs:[{kind:"train", code:"TGV INOUI 8572", route:"Paris Montparnasse 1 et 2 → Bordeaux-Saint-Jean", time:"10:05 → 12:14", detail:"1st class · coach 3 upper deck · seats 374 / 375"}],
 plan:["Check out Paris (AM)","Yarra (wine bar)"] },
-{ date:"2026-06-09", dow:"Tue", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", hotel:{ name:"Bordeaux stay", editKey:"bordeaux" }, legs:[], plan:[] },
-{ date:"2026-06-10", dow:"Wed", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", hotel:{ name:"Bordeaux stay", editKey:"bordeaux" }, legs:[], plan:[] },
-{ date:"2026-06-11", dow:"Thu", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", hotel:{ name:"Bordeaux stay", editKey:"bordeaux" }, legs:[], plan:[] },
-{ date:"2026-06-12", dow:"Fri", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", hotel:{ name:"Bordeaux stay", editKey:"bordeaux" }, legs:[], plan:[] },
+{ date:"2026-06-09", dow:"Tue", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", plan:[] },
+{ date:"2026-06-10", dow:"Wed", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", plan:[] },
+{ date:"2026-06-11", dow:"Thu", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", plan:[] },
+{ date:"2026-06-12", dow:"Fri", city:"Bordeaux", disp:"Bordeaux", country:"France", w:"Bordeaux", plan:[] },
 { date:"2026-06-13", dow:"Sat", city:"Copenhagen", disp:"Bordeaux → Copenhagen", country:"Denmark", w:"Copenhagen",
-hotel:{ name:"Copenhagen stay", editKey:"copenhagen" },
-legs:[
-{kind:"flight", code:"AF7435", route:"Bordeaux → Paris CDG", time:"14:05 → 15:25", detail:"Hall B / Aérogare 2 Term F"},
-{kind:"flight", code:"AF1050", route:"Paris CDG → Copenhagen T3", time:"16:50 → 18:45", detail:""},
-], plan:["Check out Bordeaux"] },
-{ date:"2026-06-14", dow:"Sun", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", hotel:{ name:"Copenhagen stay", editKey:"copenhagen" }, legs:[], plan:[] },
-{ date:"2026-06-15", dow:"Mon", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", hotel:{ name:"Copenhagen stay", editKey:"copenhagen" }, legs:[], plan:[] },
-{ date:"2026-06-16", dow:"Tue", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", hotel:{ name:"Copenhagen stay", editKey:"copenhagen" }, legs:[], plan:[] },
+plan:["Check out Bordeaux"] },
+{ date:"2026-06-14", dow:"Sun", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", plan:[] },
+{ date:"2026-06-15", dow:"Mon", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", plan:[] },
+{ date:"2026-06-16", dow:"Tue", city:"Copenhagen", disp:"Copenhagen", country:"Denmark", w:"Copenhagen", plan:[] },
 { date:"2026-06-17", dow:"Wed", city:"London", disp:"Copenhagen → London", country:"United Kingdom", w:"London",
-hotel:{ name:"London stay", editKey:"london" },
-legs:[{kind:"flight", code:"SK505", route:"Copenhagen T3 → London Heathrow T2", time:"15:00 → 16:00", detail:"SAS, operated by SAS Connect"}],
 plan:["Check out Copenhagen"] },
-{ date:"2026-06-18", dow:"Thu", city:"London", disp:"London", country:"United Kingdom", w:"London", hotel:{ name:"London stay", editKey:"london" }, legs:[], plan:[] },
-{ date:"2026-06-19", dow:"Fri", city:"London", disp:"London", country:"United Kingdom", w:"London", hotel:{ name:"London stay", editKey:"london" }, legs:[], plan:[] },
+{ date:"2026-06-18", dow:"Thu", city:"London", disp:"London", country:"United Kingdom", w:"London", plan:[] },
+{ date:"2026-06-19", dow:"Fri", city:"London", disp:"London", country:"United Kingdom", w:"London", plan:[] },
 { date:"2026-06-20", dow:"Sat", city:"London", disp:"London → home (overnight)", country:"United Kingdom", w:"London",
-hotel:{ name:"Overnight flight", note:"In the air" },
-legs:[{kind:"flight", code:"MH1", route:"London Heathrow T4 → Kuala Lumpur T1", time:"21:35 → 17:50 (+1)", detail:"Seats 12F / 12G"}],
 plan:["Check out London"] },
-{ date:"2026-06-21", dow:"Sun", city:"Transit", disp:"In transit (Kuala Lumpur)", country:null, w:"KL",
-hotel:{ name:"Overnight flight", note:"In the air" },
-legs:[{kind:"flight", code:"MH251", route:"Kuala Lumpur T1 → Sydney", time:"20:00 → 07:00 (+1)", detail:"Seats 10H / 10K"}], plan:[] },
+{ date:"2026-06-21", dow:"Sun", city:"Transit", disp:"In transit (Kuala Lumpur)", country:null, w:"KL", plan:[] },
 { date:"2026-06-22", dow:"Mon", city:"Sydney", disp:"Arrive Sydney", country:"Australia", w:"Sydney",
-hotel:{ name:"Home", note:"" },
-legs:[{kind:"flight", code:"MH251", route:"Arrive Sydney T1", time:"07:00", detail:"Customs & immigration"}], plan:["Home"] },
+plan:["Home"] },
 ];
+
+/* ============================== PRIVATE NOTES (authenticated-only) ============================== */
+
+const PRIVATE_TYPE_META = {
+hotel:    { icon: Bed,         label: "Stay" },
+flight:   { icon: Plane,       label: "Flight" },
+train:    { icon: TrainFront,  label: "Train" },
+ticket:   { icon: Ticket,      label: "Ticket" },
+reminder: { icon: BellRing,    label: "Reminder" },
+note:     { icon: StickyNote,  label: "Note" },
+};
+const PRIVATE_TYPE_ORDER = ["hotel","flight","train","ticket","reminder","note"];
+function privateTypeMeta(t){ return PRIVATE_TYPE_META[t] || PRIVATE_TYPE_META.note; }
 
 /* ============================== EXPLORE DATA ============================== */
 
@@ -182,7 +173,9 @@ const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
 return data ? data.publicUrl : "";
 }
 
-// Read all shared data from Supabase into the app state shape.
+// Read all SHARED PUBLIC-READ data from Supabase into the app state shape.
+// NOTE: private_notes is intentionally NOT fetched here. It is authenticated-only
+// and loaded separately via loadPrivateNotes() so viewer mode never requests it.
 async function loadAll() {
 const [placesRes, statusRes, journalRes, photosRes] = await Promise.all([
 supabase.from("places").select("*"),
@@ -205,6 +198,24 @@ region: r.region || "", vintage: r.vintage || "", city: r.city || "", day: r.day
 photos: photosByJournal[r.id] || [],
 }));
 return { exploreAdded, exploreStatus, journal };
+}
+
+// Authenticated-only load of private logistics. Returns {} on any denial/error
+// so the app tolerates anon denial gracefully and never surfaces private data.
+async function loadPrivateNotes() {
+try {
+const { data, error } = await supabase
+.from("private_notes")
+.select("*")
+.order("day", { ascending: true })
+.order("sort_order", { ascending: true });
+if (error) return { privateNotes: [] };
+const privateNotes = (data || []).map(r => ({
+id: r.id, day: r.day, type: r.type, title: r.title,
+body: r.body || "", ref: r.ref || "", url: r.url || "", sort_order: r.sort_order || 0,
+}));
+return { privateNotes };
+} catch (e) { return { privateNotes: [] }; }
 }
 
 const db = {
@@ -240,6 +251,15 @@ const url = photoPublicUrl(path);
 const id = uid();
 await supabase.from("journal_photos").insert({ id, journal_id: journalId, path, url, caption: file.name || null });
 return { id, src: url, path, name: file.name || "" };
+},
+async addPrivateNote(n) {
+await supabase.from("private_notes").insert({
+id: n.id, day: n.day, type: n.type, title: n.title,
+body: n.body || null, ref: n.ref || null, url: n.url || null, sort_order: n.sort_order || 0,
+});
+},
+async deletePrivateNote(id) {
+await supabase.from("private_notes").delete().eq("id", id);
 },
 };
 
@@ -294,7 +314,7 @@ Moment:{ icon: Sparkles, color: "var(--ink)" },
 };
 
 const emptyState = {
-weather: {}, planDone: {}, planAdd: {}, journal: [], hotels: {}, exploreStatus: {}, exploreAdded: [],
+weather: {}, planDone: {}, planAdd: {}, journal: [], hotels: {}, exploreStatus: {}, exploreAdded: [], privateNotes: [],
 };
 
 /* ============================== AUTH SCREEN ============================== */
@@ -367,7 +387,10 @@ return () => { sub.subscription.unsubscribe(); };
 const refresh = async () => {
 try {
 const shared = await loadAll();
-setState(s => ({ ...s, ...localPrefs.current, ...shared }));
+// Private logistics are fetched ONLY when authenticated. Viewer mode never requests them.
+let priv = { privateNotes: [] };
+if (session) { priv = await loadPrivateNotes(); }
+setState(s => ({ ...s, ...localPrefs.current, ...shared, ...priv }));
 setLoaded(true);
 } catch (e) { setLoaded(true); }
 };
@@ -397,7 +420,7 @@ const meals = state.journal.filter(j => j.type === "Meal").length;
 const rated = state.journal.filter(j => j.you > 0);
 const bestMeal = [...state.journal].filter(j => j.type === "Meal").sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
 
-const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db };
+const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session };
 
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session && !viewerMode) return <div className="app"><Style /><AuthScreen onView={() => setViewerMode(true)} /></div>;
@@ -464,6 +487,86 @@ else ctx.flash("Sign in to make changes");
 };
 }
 
+/* ============================== PRIVATE NOTES (logged-in only) ============================== */
+
+// Renders private logistics for a given day index. Only ever mounted when ctx.canEdit
+// is true, so logged-out viewer mode never renders private note data.
+function PrivateNotes({ ctx, dayIndex, compact }) {
+const { state, copy, canEdit, db, setState, flash } = ctx;
+const [adding, setAdding] = useState(false);
+if (!canEdit) return null;
+const notes = (state.privateNotes || []).filter(n => n.day === dayIndex);
+const groups = PRIVATE_TYPE_ORDER
+.map(t => ({ type: t, items: notes.filter(n => n.type === t) }))
+.filter(g => g.items.length);
+
+const del = async (id) => {
+const prev = state.privateNotes;
+setState(s => ({ ...s, privateNotes: (s.privateNotes || []).filter(n => n.id !== id) }));
+try { await db.deletePrivateNote(id); flash("Private note removed"); }
+catch (e) { flash("Delete failed"); setState(s => ({ ...s, privateNotes: prev })); }
+};
+const addNote = async (note) => {
+const entry = { id: uid(), day: dayIndex, type: note.type, title: note.title, body: note.body, ref: note.ref, url: "", sort_order: 0 };
+setState(s => ({ ...s, privateNotes: [ ...(s.privateNotes || []), entry ] }));
+setAdding(false);
+try { await db.addPrivateNote(entry); flash("Private note added"); }
+catch (e) { flash("Could not save note"); }
+};
+
+if (!notes.length && !adding) {
+return (
+<div className="privsec">
+<div className="privhead"><Bed size={13} /> Private logistics</div>
+<button className="privadd" onClick={() => setAdding(true)}><Plus size={14} /> Add private note</button>
+</div>
+);
+}
+return (
+<div className="privsec">
+<div className="privhead"><Bed size={13} /> Private logistics<span className="privlock">logged-in only</span></div>
+{groups.map(g => {
+const Ic = privateTypeMeta(g.type).icon;
+return (
+<div key={g.type} className="privgroup">
+<div className="privgroup-label"><Ic size={12} /> {privateTypeMeta(g.type).label}</div>
+{g.items.map(n => (
+<div key={n.id} className={"privrow" + (compact ? " compact" : "")}>
+<div className="privrow-body">
+<div className="privrow-title">{n.title}</div>
+{n.body && <div className="muted xs">{n.body}</div>}
+{n.ref && <button className="reflink xs" onClick={() => copy(n.ref, "Private ref")}><span>{n.ref}</span><Copy size={11} /></button>}
+</div>
+<button className="del" onClick={() => del(n.id)}><Trash2 size={13} /></button>
+</div>
+))}
+</div>
+);
+})}
+{adding
+? <AddPrivateNote onCancel={() => setAdding(false)} onAdd={addNote} />
+: <button className="privadd" onClick={() => setAdding(true)}><Plus size={14} /> Add private note</button>}
+</div>
+);
+}
+
+function AddPrivateNote({ onAdd, onCancel }) {
+const [type, setType] = useState("note");
+const [title, setTitle] = useState("");
+const [body, setBody] = useState("");
+const [ref, setRef] = useState("");
+const go = () => { if (!title.trim()) return; onAdd({ type, title: title.trim(), body: body.trim(), ref: ref.trim() }); };
+return (
+<div className="privadd-form">
+<select className="sel full" value={type} onChange={e => setType(e.target.value)}>{PRIVATE_TYPE_ORDER.map(t => <option key={t} value={t}>{privateTypeMeta(t).label}</option>)}</select>
+<input className="inline-input full" placeholder="Title (e.g. Hotel, Flight)…" value={title} onChange={e => setTitle(e.target.value)} />
+<input className="inline-input full" placeholder="Details (optional)…" value={body} onChange={e => setBody(e.target.value)} />
+<input className="inline-input full" placeholder="Reference / booking code (optional)…" value={ref} onChange={e => setRef(e.target.value)} />
+<div className="btnrow"><button className="primary grow" onClick={go}><Plus size={15} /> Add</button><button className="ghostbtn" onClick={onCancel}>Cancel</button></div>
+</div>
+);
+}
+
 /* ============================== TODAY ============================== */
 
 function Today(ctx) {
@@ -506,18 +609,7 @@ value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather,
 </button>
 )}
 
-{d.hotel && (d.hotel.address || d.hotel.note) && (
-<Card>
-<div className="row-icon"><Bed size={16} /><span className="row-title">{d.hotel.name}</span></div>
-{d.hotel.address && <div className="muted sm">{d.hotel.address}</div>}
-{d.hotel.checkin && <div className="muted sm">{d.hotel.checkin}</div>}
-{d.hotel.ref && <button className="reflink" onClick={() => copy(d.hotel.ref, "Booking ref")}><span>{d.hotel.ref}</span><Copy size={13} /></button>}
-{d.hotel.note && <div className="muted sm">{d.hotel.note}</div>}
-</Card>
-)}
-
-{d.legs.length > 0 && <div className="section-label">Today's moves</div>}
-{d.legs.map((l, i) => <LegRow key={i} leg={l} copy={copy} />)}
+<PrivateNotes ctx={ctx} dayIndex={tIndex} />
 
 <div className="section-label">Plan</div>
 <Card>
@@ -576,7 +668,6 @@ return (
 <div className="dc-sub">
 <span className="wchip"><WeatherGlyph kind={clim.icon} size={13} /> {clim.hi}°</span>
 <span className="tzchip"><Clock size={12} /> {tzChip(tz)}</span>
-{d.legs[0] && <span className="dc-leg">{d.legs[0].kind === "train" ? <TrainFront size={12} /> : <Plane size={12} />} {d.legs[0].code}</span>}
 </div>
 </div>
 <ChevronDown size={18} className={"chev" + (isOpen ? " up" : "")} />
@@ -584,21 +675,7 @@ return (
 {isOpen && (
 <div className="daycard-body">
 <div className="tzline"><Clock size={13} /> {tzFull(tz)}</div>
-{d.hotel && (d.hotel.address || d.hotel.note || d.hotel.editKey) && (
-<div className="bodyrow"><Bed size={14} />
-<div>
-<div className="row-title sm">{d.hotel.name}</div>
-{d.hotel.address && <div className="muted xs">{d.hotel.address}</div>}
-{d.hotel.ref && <button className="reflink xs" onClick={() => copy(d.hotel.ref, "Ref")}>{d.hotel.ref} <Copy size={11} /></button>}
-{d.hotel.editKey && !d.hotel.address && (
-<input className="inline-input" placeholder="Add accommodation…"
-value={state.hotels[d.hotel.editKey] || ""} onChange={e => setLocal(s => ({ ...s, hotels: { ...s.hotels, [d.hotel.editKey]: e.target.value } }))} />
-)}
-{d.hotel.note && <div className="muted xs">{d.hotel.note}</div>}
-</div>
-</div>
-)}
-{d.legs.map((l, k) => <LegRow key={k} leg={l} copy={copy} compact />)}
+<PrivateNotes ctx={ctx} dayIndex={i} compact />
 {planItems.map(p => (
 <button key={p.id} className={"checkrow sm" + (done[p.id] ? " checked" : "")}
 onClick={() => setLocal(s => ({ ...s, planDone: { ...s.planDone, [i]: { ...(s.planDone[i] || {}), [p.id]: !(s.planDone[i] || {})[p.id] } } }))}>
@@ -872,20 +949,6 @@ return (
 
 function Card({ children }) { return <div className="card">{children}</div>; }
 
-function LegRow({ leg, copy, compact }) {
-const Ic = leg.kind === "train" ? TrainFront : Plane;
-return (
-<div className={"leg" + (compact ? " compact" : "")}>
-<div className="leg-ic"><Ic size={15} /></div>
-<div className="leg-body">
-<div className="leg-top"><button className="leg-code" onClick={() => copy(leg.code, leg.code)}>{leg.code} <Copy size={11} /></button><span className="mono">{leg.time}</span></div>
-<div className="leg-route">{leg.route}</div>
-{leg.detail && <div className="muted xs">{leg.detail}</div>}
-</div>
-</div>
-);
-}
-
 function QuickAdd({ placeholder, onAdd }) {
 const [v, setV] = useState("");
 const go = () => { if (v.trim()) { onAdd(v.trim()); setV(""); } };
@@ -1003,14 +1066,6 @@ return (
 .reflink{display:inline-flex;align-items:center;gap:6px;margin-top:10px;background:var(--powder);color:var(--accent);border-radius:9px;padding:7px 11px;font-family:var(--mono);font-size:13px;font-weight:500;cursor:pointer;}
 .reflink.xs{font-size:12px;padding:5px 9px;margin-top:7px;}
 .empty{padding:4px 2px;} .pad{padding:28px 8px;text-align:center;}
-.leg{display:flex;gap:13px;background:var(--surface);border-radius:16px;padding:15px;margin-bottom:9px;box-shadow:var(--shadow);}
-.leg.compact{background:transparent;box-shadow:none;padding:11px 0 0;border-radius:0;margin:0;}
-.leg-ic{width:34px;height:34px;flex:none;border-radius:9px;background:var(--fill);display:flex;align-items:center;justify-content:center;color:var(--accent);}
-.leg-body{flex:1;min-width:0;}
-.leg-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
-.leg-code{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent);background:none;display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:0;}
-.leg-route{font-size:14px;font-weight:500;margin-top:4px;}
-.mono{font-family:var(--mono);font-size:13px;color:var(--ink2);}
 .checkrow{display:flex;align-items:flex-start;gap:12px;width:100%;background:none;text-align:left;padding:11px 2px;cursor:pointer;}
 .checkrow.sm{padding:9px 0;}
 .box{width:23px;height:23px;flex:none;border-radius:50%;background:var(--fill2);display:flex;align-items:center;justify-content:center;color:#fff;margin-top:1px;transition:.18s cubic-bezier(.2,.8,.2,1);}
@@ -1081,6 +1136,18 @@ return (
 .place-actions{margin-top:10px;}.addday,.planpill{display:inline-flex;align-items:center;gap:6px;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}.addday{background:var(--accent);color:#fff;}.planpill{background:var(--fill);color:var(--ink);}.daypicker{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px;}.dpbtn{background:var(--fill);color:var(--ink);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:var(--sans);}.dpbtn.on{background:var(--accent);color:#fff;}.dpbtn.clear{background:transparent;color:var(--muted);}
 .addplace{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--fill);color:var(--ink);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:6px;}.btnrow{display:flex;gap:8px;}.primary.grow{width:auto;flex:1;}.ghostbtn{background:var(--fill);color:var(--ink2);border-radius:14px;padding:13px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);flex:none;}
 .nudge{width:100%;display:flex;align-items:center;gap:9px;background:var(--powder);color:var(--accent);border-radius:14px;padding:13px 15px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-bottom:12px;}.prompt-q{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:-.01em;margin-bottom:10px;}
+.privsec{background:var(--surface);border-radius:18px;padding:15px 16px;margin-bottom:10px;box-shadow:var(--shadow);border:1px solid var(--powder2);}
+.daycard-body .privsec{margin:4px 0 12px;}
+.privhead{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--accent);text-transform:uppercase;margin-bottom:10px;}
+.privlock{margin-left:auto;background:var(--powder);color:var(--accent);border-radius:999px;padding:2px 9px;font-size:10px;font-weight:600;letter-spacing:0;text-transform:none;}
+.privgroup{margin-bottom:10px;}
+.privgroup-label{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--ink2);margin-bottom:5px;}
+.privrow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line);}
+.privrow:first-of-type{border-top:none;}
+.privrow-body{flex:1;min-width:0;}
+.privrow-title{font-size:14.5px;font-weight:600;color:var(--ink);letter-spacing:-.01em;}
+.privadd{display:inline-flex;align-items:center;gap:6px;background:var(--fill);color:var(--ink);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:4px;}
+.privadd-form{margin-top:10px;}
 .authwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);}
 .authcard{width:100%;max-width:360px;background:var(--surface);border-radius:22px;padding:28px 24px;box-shadow:var(--shadow-float);text-align:center;}
 .authbrand{font-family:var(--serif);font-size:28px;font-weight:700;letter-spacing:-.03em;}
