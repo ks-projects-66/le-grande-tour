@@ -33,7 +33,8 @@ import { createClient } from "@supabase/supabase-js";
 import {
 Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
 Camera, Sparkles, Check, Plus, Copy, Trash2, Star, ChevronDown, BookOpen,
-CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote
+CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote,
+X, Map as MapIcon
 } from "lucide-react";
 
 /* ============================== SUPABASE ============================== */
@@ -161,6 +162,16 @@ if (p.tag === "Wine bar") return "Wine";
 return "Meal";
 }
 
+// Build a Google Maps walking-directions URL through a day's planned places.
+// Origin is intentionally omitted: Maps then starts from the user's current
+// location (the hotel, in practice). One place falls back to a simple search.
+function mapDayUrl(places) {
+const pts = places.map(p => encodeURIComponent([p.name, (p.area || "").replace(/·/g, ","), p.city].filter(Boolean).join(", ")));
+if (!pts.length) return null;
+if (pts.length === 1) return `https://www.google.com/maps/search/?api=1&query=${pts[0]}`;
+return `https://www.google.com/maps/dir/?api=1&destination=${pts[pts.length - 1]}&waypoints=${pts.slice(0, -1).join("%7C")}&travelmode=walking`;
+}
+
 /* ============================== STORAGE (Supabase) ============================== */
 
 const LEGACY_KEY = "euro26:v1";
@@ -173,6 +184,23 @@ const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
 return data ? data.publicUrl : "";
 }
 
+// Compress a photo client-side before upload: max 1600px long edge, JPEG ~0.82.
+// Cuts typical phone photos by ~90% for roaming upload. Falls back to the
+// original file on any failure (e.g. unsupported format), so uploads never break.
+async function compressImage(file, maxDim = 1600, quality = 0.82) {
+try {
+const bmp = await createImageBitmap(file);
+const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+if (scale === 1 && file.size < 900000) return file;
+const canvas = document.createElement("canvas");
+canvas.width = Math.max(1, Math.round(bmp.width * scale));
+canvas.height = Math.max(1, Math.round(bmp.height * scale));
+canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+const blob = await new Promise(res => canvas.toBlob(res, "image/jpeg", quality));
+return blob || file;
+} catch (e) { return file; }
+}
+
 // Read all SHARED PUBLIC-READ data from Supabase into the app state shape.
 // NOTE: private_notes is intentionally NOT fetched here. It is authenticated-only
 // and loaded separately via loadPrivateNotes() so viewer mode never requests it.
@@ -183,6 +211,9 @@ supabase.from("place_status").select("*"),
 supabase.from("journal_entries").select("*").order("ts", { ascending: false }),
 supabase.from("journal_photos").select("*"),
 ]);
+// If the core tables both failed (network down, Supabase outage), surface it
+// rather than silently rendering an empty trip.
+if (placesRes.error && journalRes.error) throw new Error("Trip data failed to load");
 const exploreAdded = (placesRes.data || []).map(r => ({ id: r.id, city: r.city, cat: r.cat, tag: r.tag, name: r.name, area: r.area || "", note: r.note || "" }));
 const exploreStatus = {};
 (statusRes.data || []).forEach(r => {
@@ -243,14 +274,29 @@ if (paths.length) await supabase.storage.from(PHOTO_BUCKET).remove(paths);
 await supabase.from("journal_entries").delete().eq("id", id);
 },
 async uploadPhoto(journalId, file) {
-const ext = (file.name && file.name.includes(".")) ? file.name.split(".").pop().toLowerCase() : "jpg";
+const blob = await compressImage(file);
+const compressed = blob !== file;
+const ext = compressed ? "jpg" : ((file.name && file.name.includes(".")) ? file.name.split(".").pop().toLowerCase() : "jpg");
 const path = `${journalId}/${uid()}.${ext}`;
-const up = await supabase.storage.from(PHOTO_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || "image/jpeg" });
+const up = await supabase.storage.from(PHOTO_BUCKET).upload(path, blob, { cacheControl: "3600", upsert: false, contentType: compressed ? "image/jpeg" : (file.type || "image/jpeg") });
 if (up.error) throw up.error;
 const url = photoPublicUrl(path);
 const id = uid();
 await supabase.from("journal_photos").insert({ id, journal_id: journalId, path, url, caption: file.name || null });
 return { id, src: url, path, name: file.name || "" };
+},
+// Update the editable fields of an existing journal entry.
+async updateJournal(j) {
+const { error } = await supabase.from("journal_entries").update({
+type: j.type, title: j.title, note: j.note || null, you: j.you || 0, her: j.her || 0,
+region: j.region || null, vintage: j.vintage || null, city: j.city || null,
+}).eq("id", j.id);
+if (error) throw error;
+},
+// Remove a single photo: storage object first, then the DB row.
+async deletePhoto(photo) {
+if (photo.path) await supabase.storage.from(PHOTO_BUCKET).remove([photo.path]);
+await supabase.from("journal_photos").delete().eq("id", photo.id);
 },
 async addPrivateNote(n) {
 await supabase.from("private_notes").insert({
@@ -360,6 +406,7 @@ const [viewerMode, setViewerMode] = useState(false);
 const [loaded, setLoaded] = useState(false);
 const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 const [toast, setToast] = useState("");
+const [stale, setStale] = useState(false);
 const [state, setState] = useState(emptyState);
 const localPrefs = useRef({ weather:{}, planDone:{}, planAdd:{}, hotels:{} });
 
@@ -391,9 +438,18 @@ const shared = await loadAll();
 let priv = { privateNotes: [] };
 if (session) { priv = await loadPrivateNotes(); }
 setState(s => ({ ...s, ...localPrefs.current, ...shared, ...priv }));
+setStale(false);
 setLoaded(true);
-} catch (e) { setLoaded(true); }
+} catch (e) { setStale(true); setLoaded(true); }
 };
+
+// Refetch shared data whenever the app returns to the foreground, so two
+// phones stay in sync across the day without manual reloads.
+useEffect(() => {
+const onVis = () => { if (document.visibilityState === "visible" && (session || viewerMode)) refresh(); };
+document.addEventListener("visibilitychange", onVis);
+return () => document.removeEventListener("visibilitychange", onVis);
+}, [session, viewerMode]);
 
 useEffect(() => {
 let live = true;
@@ -448,6 +504,11 @@ return (
 ? <button className="signout" onClick={signOut}><LogOut size={12} /> Sign out</button>
 : <button className="signout" onClick={() => setViewerMode(false)}>Sign in</button>}
 </div>
+{stale && (
+<button className="stalebanner" onClick={refresh}>
+Couldn't load the latest trip data. Showing what's on this device — tap to retry.
+</button>
+)}
 </header>
 
 <main className="scroll">
@@ -577,10 +638,12 @@ const clim = CLIMATE[d.w];
 const wOverride = state.weather[tIndex] || "";
 const toRate = mergedPlaces(state).filter(p => p.been && !p.rated).length;
 const exploreToday = mergedPlaces(state).filter(p => p.plannedDay === tIndex);
-const planItems = (d.plan || []).map((t, j) => ({ id: `d${tIndex}-p${j}`, t })).concat((state.planAdd[tIndex] || []));
+const planItems = (d.plan || []).map((t, j) => ({ id: `d${tIndex}-p${j}`, t })).concat((state.planAdd[tIndex] || []).map(p => ({ ...p, custom: true })));
 const done = state.planDone[tIndex] || {};
 const donePlaces = mergedPlaces(state).filter(p => p.been).length;
 const toggle = (id) => setLocal(s => ({ ...s, planDone: { ...s.planDone, [tIndex]: { ...(s.planDone[tIndex] || {}), [id]: !(s.planDone[tIndex] || {})[id] } } }));
+const removePlan = (id) => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [tIndex]: (s.planAdd[tIndex] || []).filter(x => x.id !== id) } }));
+const mapUrl = mapDayUrl(exploreToday);
 
 return (
 <div className="page">
@@ -615,10 +678,13 @@ value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather,
 <Card>
 {planItems.length === 0 && exploreToday.length === 0 && <div className="muted sm empty">Nothing locked in. Add something below as the day unfolds.</div>}
 {planItems.map(p => (
-<button key={p.id} className={"checkrow" + (done[p.id] ? " checked" : "")} onClick={() => toggle(p.id)}>
+<div key={p.id} className="planrow">
+<button className={"checkrow" + (done[p.id] ? " checked" : "")} onClick={() => toggle(p.id)}>
 <span className="box">{done[p.id] && <Check size={13} strokeWidth={3} />}</span>
 <span className="checktext">{p.t}</span>
 </button>
+{p.custom && canEdit && <button className="del" onClick={() => removePlan(p.id)} aria-label="Remove plan item"><Trash2 size={13} /></button>}
+</div>
 ))}
 {exploreToday.map(p => (
 <button key={p.id} className={"checkrow" + (p.been ? " checked" : "")} onClick={() => setStatus(p.id, { been: !p.been })}>
@@ -630,6 +696,12 @@ value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather,
 <QuickAdd placeholder="Add to today…" onAdd={(t) => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [tIndex]: [ ...(s.planAdd[tIndex] || []), { id: uid(), t } ] } }))} />
 )}
 </Card>
+
+{mapUrl && (
+<a className="mapday" href={mapUrl} target="_blank" rel="noopener noreferrer">
+<MapIcon size={14} /> Map today's stops{exploreToday.length > 1 ? " in walking order" : ""}
+</a>
+)}
 
 <div className="ministats">
 <Stat label="Planned today" value={planItems.length + exploreToday.length} />
@@ -656,9 +728,10 @@ const clim = CLIMATE[d.w];
 const tz = TZ[d.w] || TZ.Sydney;
 const isOpen = open[i];
 const isToday = i === tIndex;
-const planItems = (d.plan || []).map((t, j) => ({ id: `d${i}-p${j}`, t })).concat((state.planAdd[i] || []));
+const planItems = (d.plan || []).map((t, j) => ({ id: `d${i}-p${j}`, t })).concat((state.planAdd[i] || []).map(p => ({ ...p, custom: true })));
 const done = state.planDone[i] || {};
 const exploreDay = mergedPlaces(state).filter(p => p.plannedDay === i);
+const dayMapUrl = mapDayUrl(exploreDay);
 return (
 <div key={i} className={"daycard" + (isToday ? " today" : "")} style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}>
 <button className="daycard-head" onClick={() => toggleOpen(i)}>
@@ -677,11 +750,15 @@ return (
 <div className="tzline"><Clock size={13} /> {tzFull(tz)}</div>
 <PrivateNotes ctx={ctx} dayIndex={i} compact />
 {planItems.map(p => (
-<button key={p.id} className={"checkrow sm" + (done[p.id] ? " checked" : "")}
+<div key={p.id} className="planrow">
+<button className={"checkrow sm" + (done[p.id] ? " checked" : "")}
 onClick={() => setLocal(s => ({ ...s, planDone: { ...s.planDone, [i]: { ...(s.planDone[i] || {}), [p.id]: !(s.planDone[i] || {})[p.id] } } }))}>
 <span className="box">{done[p.id] && <Check size={12} strokeWidth={3} />}</span>
 <span className="checktext">{p.t}</span>
 </button>
+{p.custom && canEdit && <button className="del" aria-label="Remove plan item"
+onClick={() => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [i]: (s.planAdd[i] || []).filter(x => x.id !== p.id) } }))}><Trash2 size={13} /></button>}
+</div>
 ))}
 {exploreDay.map(p => (
 <button key={p.id} className={"checkrow sm" + (p.been ? " checked" : "")}
@@ -690,6 +767,11 @@ onClick={() => setStatus(p.id, { been: !p.been })}>
 <span className="checktext">{p.name}<span className="vibetag inline">{p.tag}</span></span>
 </button>
 ))}
+{dayMapUrl && (
+<a className="mapday sm" href={dayMapUrl} target="_blank" rel="noopener noreferrer">
+<MapIcon size={13} /> Map this day
+</a>
+)}
 {canEdit && (
 <QuickAdd placeholder="Add a stop…" onAdd={(t) => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [i]: [ ...(s.planAdd[i] || []), { id: uid(), t } ] } }))} />
 )}
@@ -718,6 +800,7 @@ const [vintage, setVintage] = useState("");
 const [files, setFiles] = useState([]);
 const [busy, setBusy] = useState(false);
 const [viewer, setViewer] = useState(null);
+const [editing, setEditing] = useState(null);
 
 const add = async () => {
 if (!title.trim()) return;
@@ -728,6 +811,7 @@ try {
 await db.addJournal(entry);
 const uploaded = [];
 for (const f of files) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
+files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
 entry.photos = uploaded;
 setState(s => ({ ...s, journal: [entry, ...s.journal] }));
 setTitle(""); setNote(""); setYou(0); setHer(0); setRegion(""); setVintage(""); setFiles([]);
@@ -736,6 +820,7 @@ flash("Saved");
 setBusy(false);
 };
 const del = async (id) => {
+if (!window.confirm("Delete this entry? Its photos will be removed too.")) return;
 const prev = state.journal;
 setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== id) }));
 if (!canEdit) { flash("Sign in to delete"); setState(s => ({ ...s, journal: prev })); return; }
@@ -795,23 +880,114 @@ const split = j.you > 0 && j.her > 0 && Math.abs(j.you - j.her) >= 2;
 return (
 <div key={j.id} className="jcard">
 <div className="jcard-icon" style={{ color: TYPE_META[j.type].color }}><Ic size={16} /></div>
-<div className="jcard-body">
+<div className={"jcard-body" + (canEdit ? " editable" : "")} onClick={() => { if (canEdit) setEditing(j); }}>
 <div className="jcard-title">{j.title}{j.vintage ? <span className="vint"> {j.vintage}</span> : ""}</div>
 {(j.region || j.city) && <div className="muted xs">{[j.region, j.city].filter(Boolean).join(" · ")}</div>}
 {j.note && <div className="jcard-note">{j.note}</div>}
-{!!(j.photos || []).length && <PhotoGrid photos={j.photos} onOpen={setViewer} />}
+{!!(j.photos || []).length && <PhotoGrid photos={j.photos} onOpen={(idx) => setViewer({ photos: j.photos, index: idx })} />}
 <div className="jcard-rate">
 <MiniStars label="You" v={j.you} />
 <MiniStars label="H" v={j.her} />
 {split && <span className="split">split decision</span>}
 </div>
 </div>
-{canEdit && <button className="del" onClick={() => del(j.id)}><Trash2 size={14} /></button>}
+{canEdit && <button className="del" onClick={() => del(j.id)} aria-label="Delete entry"><Trash2 size={14} /></button>}
 </div>
 );
 })}
 {state.journal.length === 0 && <div className="muted sm empty pad">Log your first meal, glass or moment. By London this becomes the trip diary.</div>}
-{viewer && <PhotoViewer src={viewer} onClose={() => setViewer(null)} />}
+{viewer && <PhotoViewer photos={viewer.photos} index={viewer.index} onClose={() => setViewer(null)} />}
+{editing && <EditEntry entry={editing} ctx={ctx} onClose={() => setEditing(null)} />}
+</div>
+);
+}
+
+/* ============================== EDIT ENTRY (bottom sheet) ============================== */
+
+// Edit an existing journal entry in place: type, name, city, notes, ratings,
+// and photos (remove existing, add new). Reuses the Add Entry form anatomy
+// inside an iOS-style bottom sheet so nothing new is added to the tab bar.
+function EditEntry({ entry, ctx, onClose }) {
+const { setState, flash, db, canEdit } = ctx;
+const [type, setType] = useState(entry.type);
+const [title, setTitle] = useState(entry.title);
+const [note, setNote] = useState(entry.note || "");
+const [city, setCity] = useState(entry.city || "");
+const [region, setRegion] = useState(entry.region || "");
+const [vintage, setVintage] = useState(entry.vintage || "");
+const [you, setYou] = useState(entry.you || 0);
+const [her, setHer] = useState(entry.her || 0);
+const [photos, setPhotos] = useState(entry.photos || []);
+const [files, setFiles] = useState([]);
+const [busy, setBusy] = useState(false);
+
+// Removing an existing photo deletes it from shared storage immediately,
+// and keeps the parent journal state consistent so a Cancel cannot show
+// a photo that no longer exists.
+const removePhoto = async (ph) => {
+if (!window.confirm("Remove this photo from the entry and shared storage?")) return;
+setPhotos(ps => ps.filter(p => p.id !== ph.id));
+setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, photos: (j.photos || []).filter(p => p.id !== ph.id) } : j) }));
+try { await db.deletePhoto(ph); flash("Photo removed"); } catch (e) { flash("Could not remove photo"); }
+};
+
+const save = async () => {
+if (!title.trim()) return;
+if (!canEdit) { flash("Sign in to edit"); return; }
+setBusy(true);
+const patch = { id: entry.id, type, title: title.trim(), note: note.trim(), you, her, region: region.trim(), vintage: vintage.trim(), city: city.trim() };
+try {
+await db.updateJournal(patch);
+const uploaded = [];
+for (const f of files) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
+files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
+const nextPhotos = [...photos, ...uploaded];
+setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, ...patch, photos: nextPhotos } : j) }));
+flash("Updated");
+onClose();
+} catch (e) { flash("Could not update entry"); }
+setBusy(false);
+};
+
+return (
+<div className="sheet" onClick={onClose}>
+<div className="sheetcard" onClick={e => e.stopPropagation()}>
+<div className="sheethead">
+<div className="sheettitle">Edit entry</div>
+<button className="sheetx" onClick={onClose} aria-label="Close"><X size={16} /></button>
+</div>
+<div className="typetabs">
+{Object.keys(TYPE_META).map(tp => {
+const Ic = TYPE_META[tp].icon;
+return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} onClick={() => setType(tp)}><Ic size={15} /> {tp}</button>;
+})}
+</div>
+<input className="inline-input full" placeholder={type === "Wine" ? "Producer / wine name…" : type === "Moment" ? "What happened…" : "Name…"} value={title} onChange={e => setTitle(e.target.value)} />
+{type === "Wine" && (
+<div className="addrow">
+<input className="inline-input" placeholder="Region / appellation" value={region} onChange={e => setRegion(e.target.value)} />
+<input className="inline-input vintage" placeholder="Vintage" value={vintage} onChange={e => setVintage(e.target.value)} />
+</div>
+)}
+<input className="inline-input full" placeholder="City / location" value={city} onChange={e => setCity(e.target.value)} />
+<input className="inline-input full" placeholder="Tasting note / thoughts…" value={note} onChange={e => setNote(e.target.value)} />
+{!!photos.length && (
+<div className="photogrid edit">
+{photos.map(ph => (
+<div key={ph.id} className="photoeditcell">
+<img src={ph.src} alt="" />
+<button className="photox" onClick={() => removePhoto(ph)} aria-label="Remove photo"><X size={12} strokeWidth={3} /></button>
+</div>
+))}
+</div>
+)}
+<PhotoPicker files={files} setFiles={setFiles} flash={flash} canEdit={canEdit} />
+<div className="ratepair">
+<RateRow label="You" value={you} onChange={setYou} />
+<RateRow label="Harriet" value={her} onChange={setHer} />
+</div>
+<button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving…" : "Save changes"}</button>
+</div>
 </div>
 );
 }
@@ -927,6 +1103,7 @@ try {
 await db.addJournal(entry);
 const uploaded = [];
 for (const f of files) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
+files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
 entry.photos = uploaded;
 setState(s => ({ ...s, journal: [entry, ...s.journal] }));
 setStatus(place.id, { rated: true });
@@ -980,7 +1157,11 @@ const withPreview = selected.map(f => { f.__preview = URL.createObjectURL(f); re
 setFiles([...(files || []), ...withPreview]);
 flash && flash(`${selected.length} photo${selected.length === 1 ? "" : "s"} ready`);
 };
-const remove = (idx) => setFiles((files || []).filter((_, i) => i !== idx));
+const remove = (idx) => {
+const f = (files || [])[idx];
+if (f && f.__preview) { try { URL.revokeObjectURL(f.__preview); } catch (e) {} }
+setFiles((files || []).filter((_, i) => i !== idx));
+};
 if (!canEdit) return null;
 return (
 <div className="photopicker">
@@ -992,11 +1173,31 @@ return (
 }
 
 function PhotoGrid({ photos, onOpen }) {
-return <div className="photogrid">{photos.map((p, i) => <button key={i} onClick={() => onOpen(p.src)}><img src={p.src} alt="Journal memory" loading="lazy" /></button>)}</div>;
+return <div className="photogrid">{photos.map((p, i) => <button key={i} onClick={(e) => { e.stopPropagation(); onOpen(i); }}><img src={p.src} alt="Journal memory" loading="lazy" /></button>)}</div>;
 }
 
-function PhotoViewer({ src, onClose }) {
-return <div className="viewer" onClick={onClose}><button className="viewer-close">Close</button><img src={src} alt="Expanded memory" /></div>;
+function PhotoViewer({ photos, index, onClose }) {
+const [i, setI] = useState(index);
+const startX = useRef(null);
+const onTouchStart = (e) => { startX.current = e.touches[0].clientX; };
+const onTouchEnd = (e) => {
+if (startX.current == null) return;
+const dx = e.changedTouches[0].clientX - startX.current;
+startX.current = null;
+if (dx <= -40) setI(v => Math.min(v + 1, photos.length - 1));
+else if (dx >= 40) setI(v => Math.max(v - 1, 0));
+};
+return (
+<div className="viewer" onClick={onClose} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+<button className="viewer-x" onClick={onClose} aria-label="Close"><X size={18} /></button>
+<img src={photos[i].src} alt="Expanded memory" onClick={e => e.stopPropagation()} />
+{photos.length > 1 && (
+<div className="viewer-dots" onClick={e => e.stopPropagation()}>
+{photos.map((_, n) => <button key={n} className={"dot" + (n === i ? " on" : "")} onClick={() => setI(n)} aria-label={`Photo ${n + 1}`} />)}
+</div>
+)}
+</div>
+);
 }
 
 /* ============================== FORMAT ============================== */
@@ -1115,7 +1316,7 @@ return (
 .typetab.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600;}
 .ratepair{display:flex;flex-direction:column;gap:11px;margin:14px 0;}
 .raterow{display:flex;align-items:center;justify-content:space-between;}
-.rate-label{font-size:14px;color:var(--ink2);font-weight:500;}.stars{display:flex;gap:5px;}.starbtn{background:none;cursor:pointer;padding:1px;transition:.1s;}.starbtn:active{transform:scale(.85);}
+.rate-label{font-size:14px;color:var(--ink2);font-weight:500;}.stars{display:flex;gap:5px;}.starbtn{background:none;cursor:pointer;padding:10px 6px;margin:-9px -4px;transition:.1s;}.starbtn:active{transform:scale(.85);}
 .jcard{display:flex;gap:13px;background:var(--surface);border-radius:16px;padding:15px;margin-bottom:9px;box-shadow:var(--shadow);}
 .jcard-icon{width:34px;height:34px;flex:none;border-radius:9px;background:var(--fill);display:flex;align-items:center;justify-content:center;}
 .jcard-body{flex:1;min-width:0;}.jcard-title{font-size:16.5px;font-weight:600;line-height:1.2;letter-spacing:-.01em;}
@@ -1125,7 +1326,10 @@ return (
 .del{background:none;color:var(--muted);cursor:pointer;padding:5px;flex:none;transition:.12s;}.del:active{color:var(--ink);transform:scale(.9);}
 .photopicker{margin:7px 0 8px;}.photobtn{display:inline-flex;align-items:center;gap:7px;background:var(--fill);color:var(--ink);border-radius:12px;padding:11px 13px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:7px;}.photobtn input{display:none;}
 .photochips,.photogrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px;}.photochip,.photogrid button{position:relative;aspect-ratio:1;background:var(--fill);border-radius:12px;overflow:hidden;cursor:pointer;}.photochip img,.photogrid img{width:100%;height:100%;object-fit:cover;display:block;}.photochip span{position:absolute;right:4px;top:3px;background:rgba(29,29,31,.72);color:white;border-radius:999px;width:18px;height:18px;line-height:17px;font-size:14px;}
-.viewer{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.86);display:flex;align-items:center;justify-content:center;padding:18px;}.viewer img{max-width:100%;max-height:82vh;border-radius:16px;}.viewer-close{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:10px 14px;font-weight:600;}
+.viewer{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.86);display:flex;align-items:center;justify-content:center;padding:18px;}.viewer img{max-width:100%;max-height:82vh;border-radius:16px;}.viewer-x{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.viewer-dots{position:absolute;bottom:calc(26px + env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:center;gap:8px;}
+.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);cursor:pointer;padding:0;transition:.15s;}
+.dot.on{background:#fff;}
 .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);box-shadow:0 -1px 0 rgba(0,0,0,.04);display:flex;z-index:30;padding:9px 4px calc(9px + env(safe-area-inset-bottom));}
 .tab{flex:1;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 2px;cursor:pointer;color:var(--muted);font-family:var(--sans);transition:.12s;}.tab span{font-size:10.5px;font-weight:500;}.tab.active{color:var(--accent);}.tab:active{transform:scale(.93);}
 .toast{position:fixed;bottom:92px;left:50%;transform:translateX(-50%);background:rgba(29,29,31,.92);backdrop-filter:blur(12px);color:#fff;font-size:14px;font-weight:500;padding:11px 20px;border-radius:14px;z-index:40;animation:rise .25s;box-shadow:var(--shadow-float);}
@@ -1157,6 +1361,28 @@ return (
 .viewerbtn{background:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:14px;padding:6px;}
 .authnote{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.4;}
 input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit-appearance:none;}
+/* stale data banner */
+.stalebanner{display:block;width:100%;text-align:left;background:#FFF1E2;color:#B25000;border-radius:12px;padding:10px 12px;font-size:12.5px;font-weight:600;line-height:1.35;margin-top:8px;cursor:pointer;font-family:var(--sans);}
+/* plan rows with inline delete */
+.planrow{display:flex;align-items:center;}
+.planrow .checkrow{flex:1;}
+/* map-this-day handoff link */
+.mapday{display:flex;align-items:center;justify-content:center;gap:7px;background:var(--powder);color:var(--accent);border-radius:14px;padding:12px;font-size:14px;font-weight:600;margin:2px 0 10px;text-decoration:none;font-family:var(--sans);}
+.mapday:active{background:var(--powder2);}
+.mapday.sm{padding:10px;font-size:13px;border-radius:12px;margin:8px 0 2px;}
+/* edit entry bottom sheet */
+.sheet{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;}
+.sheetcard{width:100%;max-width:520px;background:var(--bg);border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:88vh;overflow-y:auto;animation:sheetup .28s cubic-bezier(.2,.8,.2,1);}
+@keyframes sheetup{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.sheethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.sheettitle{font-family:var(--serif);font-size:20px;font-weight:700;letter-spacing:-.02em;}
+.sheetx{width:30px;height:30px;border-radius:50%;background:var(--fill2);color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;}
+.jcard-body.editable{cursor:pointer;}
+/* existing photos inside the edit sheet */
+.photogrid.edit{margin-bottom:10px;}
+.photoeditcell{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--fill);}
+.photoeditcell img{width:100%;height:100%;object-fit:cover;display:block;}
+.photox{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:999px;background:rgba(29,29,31,.75);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 /* viewer read-only mode */
 .app[data-edit="0"] .addday{display:none !important;}
 .app[data-edit="0"] .daypicker{display:none !important;}
