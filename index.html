@@ -29,6 +29,7 @@
 <script type="text/babel" data-type="module" data-presets="react">
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
 import {
 Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
@@ -949,7 +950,7 @@ onClose();
 setBusy(false);
 };
 
-return (
+return createPortal(
 <div className="sheet" onClick={onClose}>
 <div className="sheetcard" onClick={e => e.stopPropagation()}>
 <div className="sheethead">
@@ -989,7 +990,7 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} onCli
 <button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving…" : "Save changes"}</button>
 </div>
 </div>
-);
+, document.body);
 }
 
 /* ============================== EXPLORE ============================== */
@@ -1187,7 +1188,7 @@ startX.current = null;
 if (dx <= -40) setI(v => Math.min(v + 1, photos.length - 1));
 else if (dx >= 40) setI(v => Math.max(v - 1, 0));
 };
-return (
+return createPortal(
 <div className="viewer" onClick={onClose} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
 <button className="viewer-x" onClick={onClose} aria-label="Close"><X size={18} /></button>
 <img src={photos[i].src} alt="Expanded memory" onClick={e => e.stopPropagation()} />
@@ -1197,7 +1198,7 @@ return (
 </div>
 )}
 </div>
-);
+, document.body);
 }
 
 /* ============================== FORMAT ============================== */
