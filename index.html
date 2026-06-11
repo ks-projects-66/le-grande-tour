@@ -59,6 +59,15 @@ KL: { icon: "cloudrain",hi: 32, lo: 24, cond: "Hot, humid", rain: "Afternoon sto
 Sydney: { icon: "sun", hi: 18, lo: 9, cond: "Winter, cool & clear", rain: "Low" },
 };
 
+// Coordinates for the cities we can fetch a live forecast for. Transit days
+// (SydKL/KL/Sydney) intentionally have none and fall back to CLIMATE averages.
+const CITY_COORDS = {
+Paris:      { lat: 48.8566, lon: 2.3522 },
+Bordeaux:   { lat: 44.8378, lon: -0.5792 },
+Copenhagen: { lat: 55.6761, lon: 12.5683 },
+London:     { lat: 51.5074, lon: -0.1278 },
+};
+
 const TZ = {
 Paris: { z:"CEST", utc:"UTC+2", ahead:8 },
 Bordeaux: { z:"CEST", utc:"UTC+2", ahead:8 },
@@ -353,6 +362,63 @@ if (kind === "cloudrain") return <CloudRain {...p} />;
 return <CloudSun {...p} />;
 }
 
+// Map a WMO weather code (Open-Meteo) to our glyph kind + short condition text.
+function wmo(code) {
+if (code === 0) return { icon: "sun", cond: "Clear" };
+if (code === 1 || code === 2) return { icon: "cloudsun", cond: "Partly cloudy" };
+if (code === 3) return { icon: "cloud", cond: "Overcast" };
+if (code === 45 || code === 48) return { icon: "cloud", cond: "Fog" };
+if (code >= 51 && code <= 57) return { icon: "cloudrain", cond: "Drizzle" };
+if (code >= 61 && code <= 67) return { icon: "cloudrain", cond: "Rain" };
+if (code >= 71 && code <= 77) return { icon: "cloud", cond: "Snow" };
+if (code >= 80 && code <= 82) return { icon: "cloudrain", cond: "Rain showers" };
+if (code >= 85 && code <= 86) return { icon: "cloud", cond: "Snow showers" };
+if (code >= 95) return { icon: "cloudrain", cond: "Thunderstorms" };
+return { icon: "cloudsun", cond: "Mixed sky" };
+}
+
+// Fetch a live forecast from Open-Meteo (no API key, CORS-enabled). Returns
+// null on any failure so callers fall back to the static CLIMATE averages.
+async function fetchWeather(coords) {
+try {
+const u = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}`
++ `&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code`
++ `&timezone=auto&forecast_days=1`;
+const r = await fetch(u);
+if (!r.ok) return null;
+const j = await r.json();
+const cur = j.current || {};
+const day = j.daily || {};
+const code = (day.weather_code && day.weather_code[0] != null) ? day.weather_code[0] : cur.weather_code;
+const w = wmo(code);
+return {
+temp: Math.round(cur.temperature_2m),
+hi: Math.round(day.temperature_2m_max[0]),
+lo: Math.round(day.temperature_2m_min[0]),
+icon: w.icon, cond: w.cond,
+};
+} catch (e) { return null; }
+}
+
+// Live weather for a given itinerary weather-key (e.g. "Bordeaux"). Refetches
+// when the key changes and whenever the app returns to the foreground. Keys
+// without coordinates (transit days) stay null, so the static fallback shows.
+function useLiveWeather(wKey) {
+const [live, setLive] = useState(null);
+useEffect(() => {
+let on = true;
+setLive(null);
+const coords = CITY_COORDS[wKey];
+if (!coords) return;
+const go = () => fetchWeather(coords).then(w => { if (on && w) setLive(w); });
+go();
+const onVis = () => { if (document.visibilityState === "visible") go(); };
+document.addEventListener("visibilitychange", onVis);
+return () => { on = false; document.removeEventListener("visibilitychange", onVis); };
+}, [wKey]);
+return live;
+}
+
 const TYPE_META = {
 Meal: { icon: UtensilsCrossed, color: "var(--accent)" },
 Wine: { icon: Wine, color: "var(--accent)" },
@@ -636,6 +702,7 @@ const { state, setLocal, tIndex, copy, setTab, canEdit } = ctx;
 const setStatus = useSetStatus(ctx);
 const d = ITINERARY[tIndex];
 const clim = CLIMATE[d.w];
+const live = useLiveWeather(d.w);
 const wOverride = state.weather[tIndex] || "";
 const toRate = mergedPlaces(state).filter(p => p.been && !p.rated).length;
 const exploreToday = mergedPlaces(state).filter(p => p.plannedDay === tIndex);
@@ -656,11 +723,15 @@ return (
 {d.country && <div className="hero-country"><Globe size={12} /> {d.country}</div>}
 </div>
 <div className="hero-weather">
-<WeatherGlyph kind={clim.icon} size={34} />
-<div className="hero-temp">{clim.hi}°<span>/ {clim.lo}°</span></div>
+<WeatherGlyph kind={(live && !wOverride) ? live.icon : clim.icon} size={34} />
+<div className="hero-temp">
+{live ? `${live.temp}°` : `${clim.hi}°`}
+<span>{live ? `H${live.hi}° L${live.lo}°` : `/ ${clim.lo}°`}</span>
+</div>
+{live && !wOverride && <span className="wxlive"><span className="wxdot" />live</span>}
 </div>
 </div>
-<div className="hero-cond">{wOverride || `${clim.cond} · ${clim.rain}`}</div>
+<div className="hero-cond">{wOverride || (live ? live.cond : `${clim.cond} · ${clim.rain}`)}</div>
 {canEdit && (
 <input className="weather-input" placeholder="Tap to set today's real forecast…"
 value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather, [tIndex]: e.target.value } }))} />
@@ -1256,6 +1327,8 @@ return (
 .hero-weather{display:flex;flex-direction:column;align-items:flex-end;gap:3px;color:var(--accent);}
 .hero-temp{font-size:21px;font-weight:600;color:var(--ink);}
 .hero-temp span{font-size:13px;color:var(--muted);font-weight:400;margin-left:3px;}
+.wxlive{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1f9d55;}
+.wxdot{width:5px;height:5px;border-radius:50%;background:#1f9d55;}
 .hero-cond{font-size:14px;color:var(--ink2);margin-top:16px;}
 .weather-input{margin-top:12px;width:100%;background:var(--fill);color:var(--ink);border-radius:12px;padding:11px 13px;font-size:14px;font-family:var(--sans);}
 .weather-input::placeholder{color:var(--muted);}
