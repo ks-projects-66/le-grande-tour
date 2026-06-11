@@ -420,10 +420,10 @@ return live;
 }
 
 const TYPE_META = {
-Meal: { icon: UtensilsCrossed, color: "var(--accent)" },
-Wine: { icon: Wine, color: "var(--accent)" },
-Sight: { icon: Camera, color: "var(--accent)" },
-Moment:{ icon: Sparkles, color: "var(--ink)" },
+Meal: { icon: UtensilsCrossed, color: "var(--c-meal)",   bg: "var(--c-meal-bg)" },
+Wine: { icon: Wine,            color: "var(--c-wine)",   bg: "var(--c-wine-bg)" },
+Sight: { icon: Camera,         color: "var(--c-sight)",  bg: "var(--c-sight-bg)" },
+Moment:{ icon: Sparkles,       color: "var(--c-moment)", bg: "var(--c-moment-bg)" },
 };
 
 const emptyState = {
@@ -917,7 +917,7 @@ const Ic = TYPE_META[j.type].icon;
 const split = j.you > 0 && j.her > 0 && Math.abs(j.you - j.her) >= 2;
 return (
 <div key={j.id} className="jcard">
-<div className="jcard-icon" style={{ color: TYPE_META[j.type].color }}><Ic size={16} /></div>
+<div className="jcard-icon" style={{ color: TYPE_META[j.type].color, background: TYPE_META[j.type].bg }}><Ic size={16} /></div>
 <div className={"jcard-body" + (canEdit ? " editable" : "")} onClick={() => { if (canEdit) setEditing(j); }}>
 <div className="jcard-title">{j.title}{j.vintage ? <span className="vint"> {j.vintage}</span> : ""}</div>
 {(j.region || j.city) && <div className="muted xs">{[j.region, j.city].filter(Boolean).join(" · ")}</div>}
@@ -959,7 +959,7 @@ return (
 <div className="typetabs">
 {Object.keys(TYPE_META).map(tp => {
 const Ic = TYPE_META[tp].icon;
-return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} onClick={() => setType(tp)}><Ic size={15} /> {tp}</button>;
+return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style={type === tp ? { color: TYPE_META[tp].color } : undefined} onClick={() => setType(tp)}><Ic size={15} /> {tp}</button>;
 })}
 </div>
 <input className="inline-input full" placeholder={type === "Wine" ? "Producer / wine name…" : type === "Moment" ? "What happened…" : "Name…"} value={title} onChange={e => setTitle(e.target.value)} />
@@ -1056,7 +1056,7 @@ return createPortal(
 <div className="typetabs">
 {Object.keys(TYPE_META).map(tp => {
 const Ic = TYPE_META[tp].icon;
-return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} onClick={() => setType(tp)}><Ic size={15} /> {tp}</button>;
+return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style={type === tp ? { color: TYPE_META[tp].color } : undefined} onClick={() => setType(tp)}><Ic size={15} /> {tp}</button>;
 })}
 </div>
 <input className="inline-input full" placeholder={type === "Wine" ? "Producer / wine name…" : type === "Moment" ? "What happened…" : "Name…"} value={title} onChange={e => setTitle(e.target.value)} />
@@ -1316,6 +1316,10 @@ return (
 --accent:#1F4DE6; --accent-d:#163BBD; --powder:#EAF0FF; --powder2:#C9D8FF;
 --paper:#F2F2F7; --paper2:#EDEDF2; --card:#FFFFFF; --line:#EDEDF2; --line2:#C7C7CC;
 --wine:#1F4DE6; --wine-d:#163BBD; --olive:#1F4DE6; --green:#1F4DE6; --brass:#1F4DE6;
+--c-meal:#C2410C; --c-meal-bg:#FBEAE0;
+--c-wine:#9A1B3D; --c-wine-bg:#F7E3EA;
+--c-sight:#0E7C7B; --c-sight-bg:#DCF0EF;
+--c-moment:#6D28D9; --c-moment-bg:#ECE4FB;
 --shadow:0 1px 2px rgba(0,0,0,.04),0 0 1px rgba(0,0,0,.04);
 --shadow-float:0 6px 24px rgba(0,0,0,.10);
 --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",system-ui,sans-serif;
