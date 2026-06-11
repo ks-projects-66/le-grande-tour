@@ -419,6 +419,25 @@ return () => { on = false; document.removeEventListener("visibilitychange", onVi
 return live;
 }
 
+// Current wall-clock time back home in Sydney, formatted for a quick glance.
+function homeTime() {
+try {
+return new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", weekday: "short", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date());
+} catch (e) { return ""; }
+}
+
+// Small live clock showing the time back home, updated every 30s. Only mounted
+// while abroad, so travellers can judge a good moment to call family.
+function HomeClock() {
+const [t, setT] = useState(homeTime);
+useEffect(() => {
+const id = setInterval(() => setT(homeTime()), 30000);
+return () => clearInterval(id);
+}, []);
+if (!t) return null;
+return <div className="homeclock"><Clock size={13} /><span className="homeclock-l">Sydney</span><span className="homeclock-t">{t}</span></div>;
+}
+
 const TYPE_META = {
 Meal: { icon: UtensilsCrossed, color: "var(--c-meal)",   bg: "var(--c-meal-bg)" },
 Wine: { icon: Wine,            color: "var(--c-wine)",   bg: "var(--c-wine-bg)" },
@@ -703,6 +722,7 @@ const setStatus = useSetStatus(ctx);
 const d = ITINERARY[tIndex];
 const clim = CLIMATE[d.w];
 const live = useLiveWeather(d.w);
+const tzHere = TZ[d.w] || TZ.Sydney;
 const wOverride = state.weather[tIndex] || "";
 const toRate = mergedPlaces(state).filter(p => p.been && !p.rated).length;
 const exploreToday = mergedPlaces(state).filter(p => p.plannedDay === tIndex);
@@ -737,6 +757,8 @@ return (
 value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather, [tIndex]: e.target.value } }))} />
 )}
 </div>
+
+{tzHere.ahead !== 0 && <HomeClock />}
 
 {toRate > 0 && canEdit && (
 <button className="nudge" onClick={() => setTab("journal")}>
@@ -1358,6 +1380,10 @@ return (
 .hero-temp span{font-size:13px;color:var(--muted);font-weight:400;margin-left:3px;}
 .wxlive{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1f9d55;}
 .wxdot{width:5px;height:5px;border-radius:50%;background:#1f9d55;}
+.homeclock{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:14px;padding:11px 14px;margin-bottom:12px;box-shadow:var(--shadow);font-size:13px;}
+.homeclock svg{color:var(--accent);flex:none;}
+.homeclock-l{font-weight:600;color:var(--ink);}
+.homeclock-t{margin-left:auto;font-family:var(--mono);color:var(--ink2);font-variant-numeric:tabular-nums;}
 .hero-cond{font-size:14px;color:var(--ink2);margin-top:16px;}
 .weather-input{margin-top:12px;width:100%;background:var(--fill);color:var(--ink);border-radius:12px;padding:11px 13px;font-size:14px;font-family:var(--sans);}
 .weather-input::placeholder{color:var(--muted);}
