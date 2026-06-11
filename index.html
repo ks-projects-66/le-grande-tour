@@ -901,6 +901,39 @@ try { await db.deleteJournal(id); } catch (e) { flash("Delete failed"); setState
 const avg = (k) => stats.rated.length ? (stats.rated.reduce((a, j) => a + j[k], 0) / stats.rated.length).toFixed(1) : "–";
 const toRate = mergedPlaces(state).filter(p => p.been && !p.rated);
 
+// Group entries by trip day so the journal reads like a dated diary: newest
+// day first, entries within a day newest first. Entries with no day fall into
+// a trailing "Earlier" group.
+const journalGroups = useMemo(() => {
+const by = {};
+state.journal.forEach(j => { const k = (j.day != null ? j.day : -1); (by[k] = by[k] || []).push(j); });
+return Object.keys(by).map(Number).sort((a, b) => b - a).map(day => ({
+day, items: by[day].slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)),
+}));
+}, [state.journal]);
+
+const renderJCard = (j) => {
+const Ic = TYPE_META[j.type].icon;
+const split = j.you > 0 && j.her > 0 && Math.abs(j.you - j.her) >= 2;
+return (
+<div key={j.id} className="jcard">
+<div className="jcard-icon" style={{ color: TYPE_META[j.type].color }}><Ic size={16} /></div>
+<div className={"jcard-body" + (canEdit ? " editable" : "")} onClick={() => { if (canEdit) setEditing(j); }}>
+<div className="jcard-title">{j.title}{j.vintage ? <span className="vint"> {j.vintage}</span> : ""}</div>
+{(j.region || j.city) && <div className="muted xs">{[j.region, j.city].filter(Boolean).join(" · ")}</div>}
+{j.note && <div className="jcard-note">{j.note}</div>}
+{!!(j.photos || []).length && <PhotoGrid photos={j.photos} onOpen={(idx) => setViewer({ photos: j.photos, index: idx })} />}
+<div className="jcard-rate">
+<MiniStars label="You" v={j.you} />
+<MiniStars label="H" v={j.her} />
+{split && <span className="split">split decision</span>}
+</div>
+</div>
+{canEdit && <button className="del" onClick={() => del(j.id)} aria-label="Delete entry"><Trash2 size={14} /></button>}
+</div>
+);
+};
+
 return (
 <div className="page">
 <div className="page-h">Journal</div>
@@ -946,24 +979,16 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} onCli
 </Card>
 )}
 
-{state.journal.map(j => {
-const Ic = TYPE_META[j.type].icon;
-const split = j.you > 0 && j.her > 0 && Math.abs(j.you - j.her) >= 2;
+{journalGroups.map(g => {
+const di = ITINERARY[g.day];
+const place = di ? (di.city === "Transit" ? di.disp : di.city) : "";
 return (
-<div key={j.id} className="jcard">
-<div className="jcard-icon" style={{ color: TYPE_META[j.type].color }}><Ic size={16} /></div>
-<div className={"jcard-body" + (canEdit ? " editable" : "")} onClick={() => { if (canEdit) setEditing(j); }}>
-<div className="jcard-title">{j.title}{j.vintage ? <span className="vint"> {j.vintage}</span> : ""}</div>
-{(j.region || j.city) && <div className="muted xs">{[j.region, j.city].filter(Boolean).join(" · ")}</div>}
-{j.note && <div className="jcard-note">{j.note}</div>}
-{!!(j.photos || []).length && <PhotoGrid photos={j.photos} onOpen={(idx) => setViewer({ photos: j.photos, index: idx })} />}
-<div className="jcard-rate">
-<MiniStars label="You" v={j.you} />
-<MiniStars label="H" v={j.her} />
-{split && <span className="split">split decision</span>}
+<div key={g.day} className="diarygroup">
+<div className="diaryday">
+<span className="diaryday-date">{di ? `${di.dow} ${fmtDate(di.date)}` : "Earlier"}</span>
+{place && <span className="diaryday-place">{place}</span>}
 </div>
-</div>
-{canEdit && <button className="del" onClick={() => del(j.id)} aria-label="Delete entry"><Trash2 size={14} /></button>}
+{g.items.map(renderJCard)}
 </div>
 );
 })}
@@ -1391,6 +1416,10 @@ return (
 .ratepair{display:flex;flex-direction:column;gap:11px;margin:14px 0;}
 .raterow{display:flex;align-items:center;justify-content:space-between;}
 .rate-label{font-size:14px;color:var(--ink2);font-weight:500;}.stars{display:flex;gap:5px;}.starbtn{background:none;cursor:pointer;padding:10px 6px;margin:-9px -4px;transition:.1s;}.starbtn:active{transform:scale(.85);}
+.diarygroup{margin-bottom:6px;}
+.diaryday{display:flex;align-items:baseline;gap:9px;margin:22px 6px 11px;}
+.diaryday-date{font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--ink);}
+.diaryday-place{font-size:12px;color:var(--muted);font-weight:600;}
 .jcard{display:flex;gap:13px;background:var(--surface);border-radius:16px;padding:15px;margin-bottom:9px;box-shadow:var(--shadow);}
 .jcard-icon{width:34px;height:34px;flex:none;border-radius:9px;background:var(--fill);display:flex;align-items:center;justify-content:center;}
 .jcard-body{flex:1;min-width:0;}.jcard-title{font-size:16.5px;font-weight:600;line-height:1.2;letter-spacing:-.01em;}
