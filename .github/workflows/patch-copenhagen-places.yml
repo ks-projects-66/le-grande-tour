@@ -1,0 +1,48 @@
+name: Patch Copenhagen places
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-copenhagen-places.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add Copenhagen places to planner
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          if 'id:"christiania"' not in text:
+              insert = '''
+{ id:"christiania", city:"Copenhagen", cat:"See & Do", tag:"Hidden gem", name:"Christiania", area:"Christianshavn", note:"Walk through the neighbourhood near Bill's place." },
+{ id:"louisiana", city:"Copenhagen", cat:"See & Do", tag:"Must-see", name:"Louisiana Museum", area:"Humlebæk · north of Copenhagen", note:"Lovely art museum outside the city, roughly a 20 minute train ride." },
+{ id:"glyptotek", city:"Copenhagen", cat:"See & Do", tag:"Must-see", name:"Glyptotek", area:"City centre", note:"Art museum in the city, described as a gem." },
+{ id:"nyhavn-canal-tour", city:"Copenhagen", cat:"See & Do", tag:"Must-see", name:"Nyhavn canal tour", area:"Nyhavn", note:"Canal tour from the colourful harbour area." },
+{ id:"amator", city:"Copenhagen", cat:"Eat & Drink", tag:"Long lunch", name:"Amator", area:"Østerbro", note:"Recommended for brunch." },
+{ id:"seks", city:"Copenhagen", cat:"Eat & Drink", tag:"Coffee & cake", name:"Seks", area:"City centre", note:"Recommended for breakfast." },
+{ id:"juno-the-bakery", city:"Copenhagen", cat:"Eat & Drink", tag:"Sweet treat", name:"Juno the Bakery", area:"Østerbro", note:"Top notch Danish pastries." },
+{ id:"la-banchina", city:"Copenhagen", cat:"Eat & Drink", tag:"Wine bar", name:"La Banchina", area:"Refshaleøen", note:"Weather permitting, go for a dip and wine by the water." },
+{ id:"kodbyens-fiskebar", city:"Copenhagen", cat:"Eat & Drink", tag:"Fancy dinner", name:"Kødbyens Fiskebar", area:"Meatpacking District · Kødbyen", note:"Seafood dinner in the Meatpacking District." },'''
+              marker = '{ id:"baillardran", city:"Bordeaux", cat:"Eat & Drink", tag:"Sweet treat", name:"Baillardran", area:"Several shops · incl. Gare St-Jean", note:"Bordeaux\'s famous canelé maker since 1988: caramel shell, custard centre. There\'s a counter at Gare St-Jean, where your train arrives." },'
+              if marker not in text:
+                  raise SystemExit('Marker not found')
+              text = text.replace(marker, marker + insert, 1)
+              path.write_text(text, encoding='utf-8')
+          PY
+          if git diff --quiet index.html; then
+            echo "No index.html change needed"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git rm .github/workflows/patch-copenhagen-places.yml
+            git add index.html
+            git commit -m "Add Copenhagen recommendations to planner"
+            git push
+          fi
