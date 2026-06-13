@@ -71,6 +71,15 @@ Copenhagen: { lat: 55.6761, lon: 12.5683 },
 London:     { lat: 51.5074, lon: -0.1278 },
 };
 
+// Curated city hero images (Wikimedia Commons, hotlinked). Transit days have no
+// entry and fall back to the plain hero. Swap a URL here to change a city's hero.
+const CITY_HERO = {
+Paris: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Eiffel_Tower_and_Pont_Alexandre_III_at_night.jpg/1280px-Eiffel_Tower_and_Pont_Alexandre_III_at_night.jpg",
+Bordeaux: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Panorama_Place_de_la_Bourse_Bordeaux.jpg/1280px-Panorama_Place_de_la_Bourse_Bordeaux.jpg",
+Copenhagen: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Nyhavn%2C_Copenhagen%2C_20220618_1728_7354.jpg/1280px-Nyhavn%2C_Copenhagen%2C_20220618_1728_7354.jpg",
+London: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/HMS_Belfast_and_Tower_Bridge_before_sunrise.jpg/1280px-HMS_Belfast_and_Tower_Bridge_before_sunrise.jpg",
+};
+
 const TZ = {
 Paris: { z:"CEST", utc:"UTC+2", ahead:8 },
 Bordeaux: { z:"CEST", utc:"UTC+2", ahead:8 },
@@ -735,10 +744,12 @@ const donePlaces = mergedPlaces(state).filter(p => p.been).length;
 const toggle = (id) => setLocal(s => ({ ...s, planDone: { ...s.planDone, [tIndex]: { ...(s.planDone[tIndex] || {}), [id]: !(s.planDone[tIndex] || {})[id] } } }));
 const removePlan = (id) => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [tIndex]: (s.planAdd[tIndex] || []).filter(x => x.id !== id) } }));
 const mapUrl = mapDayUrl(exploreToday);
+const heroImg = CITY_HERO[d.city];
 
 return (
 <div className="page">
 <div className="hero">
+{heroImg && <img className="hero-img" src={heroImg} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = "none"; }} />}
 <div className="hero-top">
 <div>
 <div className="hero-date">{d.dow} {fmtDate(d.date)}</div>
@@ -898,6 +909,7 @@ const [files, setFiles] = useState([]);
 const [busy, setBusy] = useState(false);
 const [viewer, setViewer] = useState(null);
 const [editing, setEditing] = useState(null);
+const [jview, setJview] = useState("diary");
 
 const add = async () => {
 if (!title.trim()) return;
@@ -937,6 +949,8 @@ day, items: by[day].slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)),
 }));
 }, [state.journal]);
 
+const photoEntries = useMemo(() => state.journal.filter(j => (j.photos || []).length).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)), [state.journal]);
+
 const renderJCard = (j) => {
 const Ic = TYPE_META[j.type].icon;
 const split = j.you > 0 && j.her > 0 && Math.abs(j.you - j.her) >= 2;
@@ -972,6 +986,9 @@ return (
 
 {stats.bestMeal && <div className="best"><Sparkles size={14} /><span>Best meal so far: <strong>{stats.bestMeal.title}</strong> ({stats.bestMeal.city})</span></div>}
 
+<div className="segmented"><button className={"segbtn" + (jview === "diary" ? " on" : "")} onClick={() => setJview("diary")}>Diary</button><button className={"segbtn" + (jview === "gallery" ? " on" : "")} onClick={() => setJview("gallery")}>Gallery</button></div>
+
+{jview === "diary" && (<>
 {toRate.length > 0 && (
 <>
 <div className="section-label">Still to rate</div>
@@ -1018,6 +1035,18 @@ return (
 );
 })}
 {state.journal.length === 0 && <div className="muted sm empty pad">Log your first meal, glass or moment. By London this becomes the trip diary.</div>}
+</>)}
+{jview === "gallery" && (photoEntries.length === 0
+? <div className="muted sm empty pad">No photos yet. Add a photo to any journal entry and it shows here.</div>
+: photoEntries.map(j => {
+const di = ITINERARY[j.day];
+return (
+<div key={j.id} className="gallsec">
+<div className="diaryday"><span className="diaryday-date">{j.title}</span><span className="diaryday-place">{[j.city, di ? `${di.dow} ${fmtDate(di.date)}` : ""].filter(Boolean).join(" · ")}</span></div>
+<div className="photogrid gallery">{j.photos.map((p, i) => <button key={i} onClick={() => setViewer({ photos: j.photos, index: i })}><img src={p.src} alt="Journal memory" loading="lazy" /></button>)}</div>
+</div>
+);
+}))}
 {viewer && <PhotoViewer photos={viewer.photos} index={viewer.index} onClose={() => setViewer(null)} />}
 {editing && <EditEntry entry={editing} ctx={ctx} onClose={() => setEditing(null)} />}
 </div>
@@ -1525,6 +1554,15 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .app[data-edit="0"] .placecheck{pointer-events:none;}
 .app[data-edit="0"] .planpill{pointer-events:none;}
 .app[data-edit="0"] .raterow,.app[data-edit="0"] .stars{pointer-events:none;}
+/* Run 2: today hero image */
+.hero-img{display:block;width:calc(100% + 44px);height:150px;object-fit:cover;margin:-22px -22px 18px;}
+/* Run 2: journal diary/gallery toggle + gallery */
+.segmented{display:flex;gap:0;background:var(--fill);border-radius:0;padding:3px;margin:14px 0 4px;}
+.segbtn{flex:1;background:transparent;border-radius:0;padding:9px 4px;font-size:13px;font-weight:600;color:var(--ink2);cursor:pointer;font-family:var(--sans);transition:.15s;}
+.segbtn.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.gallsec{margin-bottom:8px;}
+.photogrid.gallery{grid-template-columns:repeat(2,1fr);gap:8px;}
+.photogrid.gallery button{aspect-ratio:4/3;}
 `}</style>
 );
 }
