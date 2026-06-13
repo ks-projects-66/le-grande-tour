@@ -38,7 +38,7 @@ import {
 Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
 Camera, Sparkles, Check, Plus, Copy, Trash2, Star, ChevronDown, BookOpen,
 CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote,
-X, Map as MapIcon
+X, Map as MapIcon, Pencil
 } from "lucide-react";
 
 /* ============================== SUPABASE ============================== */
@@ -160,12 +160,16 @@ const SEED_PLACES = [
 { id:"baillardran", city:"Bordeaux", cat:"Eat & Drink", tag:"Sweet treat", name:"Baillardran", area:"Several shops · incl. Gare St-Jean", note:"Bordeaux's famous canelé maker since 1988: caramel shell, custard centre. There's a counter at Gare St-Jean, where your train arrives." },
 ];
 
+const SEED_IDS = new Set(SEED_PLACES.map(p => p.id));
+
 function mergedPlaces(state) {
 const added = (state.exploreAdded || []);
-return [...SEED_PLACES, ...added].map(p => {
+const byId = {};
+[...SEED_PLACES, ...added].forEach(p => { byId[p.id] = { ...(byId[p.id] || {}), ...p }; });
+return Object.values(byId).map(p => {
 const st = (state.exploreStatus && state.exploreStatus[p.id]) || {};
 const plannedDay = ("plannedDay" in st) ? st.plannedDay : (p.defaultDay != null ? p.defaultDay : null);
-return { ...p, plannedDay, been: !!st.been, rated: !!st.rated };
+return { ...p, seed: SEED_IDS.has(p.id), plannedDay, been: !!st.been, rated: !!st.rated };
 });
 }
 function questionFor(p) {
@@ -274,6 +278,13 @@ return { privateNotes };
 const db = {
 async addPlace(p) {
 await supabase.from("places").insert({ id: p.id, city: p.city, cat: p.cat, tag: p.tag, name: p.name, area: p.area || null, note: p.note || null });
+},
+async upsertPlace(p) {
+await supabase.from("places").upsert({ id: p.id, city: p.city, cat: p.cat, tag: p.tag, name: p.name, area: p.area || null, note: p.note || null }, { onConflict: "id" });
+},
+async deletePlace(id) {
+await supabase.from("place_status").delete().eq("place_id", id);
+await supabase.from("places").delete().eq("id", id);
 },
 async upsertStatus(placeId, patch) {
 const row = { place_id: placeId, updated_at: new Date().toISOString() };
@@ -1100,13 +1111,8 @@ onClose();
 setBusy(false);
 };
 
-return createPortal(
-<div className="sheet" onClick={onClose}>
-<div className="sheetcard" onClick={e => e.stopPropagation()}>
-<div className="sheethead">
-<div className="sheettitle">Edit entry</div>
-<button className="sheetx" onClick={onClose} aria-label="Close"><X size={16} /></button>
-</div>
+return (
+<Sheet title="Edit entry" onClose={onClose}>
 <div className="typetabs">
 {Object.keys(TYPE_META).map(tp => {
 const Ic = TYPE_META[tp].icon;
@@ -1138,9 +1144,64 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style
 <RateRow label="Harriet" value={her} onChange={setHer} />
 </div>
 <button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving…" : "Save changes"}</button>
-</div>
-</div>
-, document.body);
+</Sheet>
+);
+}
+
+/* ============================== EDIT PLACE (bottom sheet) ============================== */
+
+// Edit an Explore place in place. Curated seed places can be edited (the change
+// is saved as a database override) but not deleted; user-added places can be both.
+function EditPlace({ place, ctx, onClose }) {
+const { setState, flash, db, canEdit } = ctx;
+const seed = SEED_IDS.has(place.id);
+const [name, setName] = useState(place.name || "");
+const [city, setCity] = useState(place.city || EXPLORE_CITIES[0]);
+const [cat, setCat] = useState(place.cat || CATS[0]);
+const [tag, setTag] = useState(place.tag || VIBES[0]);
+const [area, setArea] = useState(place.area || "");
+const [note, setNote] = useState(place.note || "");
+const [busy, setBusy] = useState(false);
+
+const save = async () => {
+if (!name.trim()) return;
+if (!canEdit) { flash("Sign in to edit"); return; }
+setBusy(true);
+const saved = { id: place.id, city, cat, tag, name: name.trim(), area: area.trim(), note: note.trim() };
+setState(s => {
+const list = s.exploreAdded || [];
+const exists = list.some(x => x.id === saved.id);
+return { ...s, exploreAdded: exists ? list.map(x => x.id === saved.id ? saved : x) : [...list, saved] };
+});
+try { await db.upsertPlace(saved); flash("Place updated"); onClose(); }
+catch (e) { flash("Could not update place"); }
+setBusy(false);
+};
+
+const remove = async () => {
+if (!window.confirm("Delete this place? This cannot be undone.")) return;
+if (!canEdit) { flash("Sign in to delete"); return; }
+setState(s => {
+const status = { ...(s.exploreStatus || {}) };
+delete status[place.id];
+return { ...s, exploreAdded: (s.exploreAdded || []).filter(x => x.id !== place.id), exploreStatus: status };
+});
+try { await db.deletePlace(place.id); flash("Place removed"); onClose(); }
+catch (e) { flash("Could not remove place"); }
+};
+
+return (
+<Sheet title="Edit place" onClose={onClose}>
+<input className="inline-input full" placeholder="Place name…" value={name} onChange={e => setName(e.target.value)} />
+<select className="sel full" value={city} onChange={e => setCity(e.target.value)}>{EXPLORE_CITIES.map(c => <option key={c}>{c}</option>)}</select>
+<select className="sel full" value={cat} onChange={e => setCat(e.target.value)}>{CATS.map(c => <option key={c}>{c}</option>)}</select>
+<select className="sel full" value={tag} onChange={e => setTag(e.target.value)}>{VIBES.map(v => <option key={v}>{v}</option>)}</select>
+<input className="inline-input full" placeholder="Area / neighbourhood (optional)" value={area} onChange={e => setArea(e.target.value)} />
+<input className="inline-input full" placeholder="Note (optional)" value={note} onChange={e => setNote(e.target.value)} />
+<button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving…" : "Save changes"}</button>
+{!seed && <button className="dangerbtn" onClick={remove}><Trash2 size={15} /> Delete place</button>}
+</Sheet>
+);
 }
 
 /* ============================== EXPLORE ============================== */
@@ -1154,6 +1215,7 @@ const [city, setCity] = useState(startCity);
 const [vibe, setVibe] = useState("All");
 const [picker, setPicker] = useState(null);
 const [adding, setAdding] = useState(false);
+const [editing, setEditing] = useState(null);
 
 const places = mergedPlaces(state).filter(p => p.city === city);
 const vibesHere = ["All", ...Array.from(new Set(places.map(p => p.tag)))];
@@ -1196,6 +1258,7 @@ return (
 {planned
 ? <button className="planpill" onClick={() => setPicker(picker === p.id ? null : p.id)}><CalendarDays size={12} /> {day.dow} {fmtDate(day.date)}</button>
 : <button className="addday" onClick={() => setPicker(picker === p.id ? null : p.id)}><CalendarPlus size={13} /> Add to a day</button>}
+{canEdit && <button className="editlink" onClick={() => setEditing(p)}><Pencil size={12} /> Edit</button>}
 </div>
 {picker === p.id && (
 <div className="daypicker">
@@ -1212,6 +1275,7 @@ return (
 {canEdit && (adding
 ? <AddPlace city={city} onCancel={() => setAdding(false)} onAdd={addPlace} />
 : <button className="addplace" onClick={() => setAdding(true)}><Plus size={16} /> Add a place</button>)}
+{editing && <EditPlace place={editing} ctx={ctx} onClose={() => setEditing(null)} />}
 </div>
 );
 }
@@ -1274,6 +1338,22 @@ return (
 }
 
 /* ============================== SHARED UI ============================== */
+
+// Shared iOS-style bottom sheet. Both the journal entry editor and the place
+// editor render their forms inside this, so the sheet chrome is defined once.
+function Sheet({ title, onClose, children }) {
+return createPortal(
+<div className="sheet" onClick={onClose}>
+<div className="sheetcard" onClick={e => e.stopPropagation()}>
+<div className="sheethead">
+<div className="sheettitle">{title}</div>
+<button className="sheetx" onClick={onClose} aria-label="Close"><X size={16} /></button>
+</div>
+{children}
+</div>
+</div>
+, document.body);
+}
 
 function Card({ children }) { return <div className="card">{children}</div>; }
 
@@ -1563,6 +1643,9 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .gallsec{margin-bottom:8px;}
 .photogrid.gallery{grid-template-columns:repeat(2,1fr);gap:8px;}
 .photogrid.gallery button{aspect-ratio:4/3;}
+/* Run 3: explore edit affordance + destructive action */
+.editlink{display:inline-flex;align-items:center;gap:6px;border-radius:0;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);background:var(--fill);color:var(--ink2);margin-left:7px;}
+.dangerbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:transparent;color:#B25000;border-radius:0;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:8px;}
 `}</style>
 );
 }
