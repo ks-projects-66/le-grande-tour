@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Voyage — plan any trip</title>
+<meta name="description" content="Voyage — plan any trip, anywhere. Build your itinerary, track each day, and keep a shared journal of meals, wines and moments.">
+<meta property="og:title" content="Voyage">
+<meta property="og:description" content="Plan any trip, anywhere — itinerary, live weather, time zones and a shared trip journal.">
 <meta name="theme-color" content="#F2F2F7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -45,7 +48,8 @@ const SUPABASE_ANON_KEY = "sb_publishable_lHRUROp8gqkZcDRUuVuI9w_Vc00p7Ra";
 const PHOTO_BUCKET = "wl-photos";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const PRODUCT = "Voyage"; // white-label product name (the trip name becomes the in-app brand)
+const PRODUCT = "Voyage"; // app name — shown on the auth screen and the trips list.
+const TAGLINE = "PLAN ANY TRIP, ANYWHERE"; // (inside a trip, the trip's own name becomes the header brand)
 
 /* ============================== EXPLORE TAXONOMY ============================== */
 
@@ -456,7 +460,7 @@ return (
 <div className="authwrap">
 <div className="authcard">
 <div className="authbrand">{PRODUCT}</div>
-<div className="authsub">PLAN ANY TRIP, ANYWHERE</div>
+<div className="authsub">{TAGLINE}</div>
 <form onSubmit={submit}>
 <input className="authinput" type="email" autoComplete="username" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
 <input className="authinput" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} placeholder="Password" value={pw} onChange={e => setPw(e.target.value)} />
