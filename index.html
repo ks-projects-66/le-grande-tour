@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>html,body,#root{height:100%;margin:0}body{background:#F2F2F7;-webkit-text-size-adjust:100%}</style>
 <script type="importmap">
 { "imports": {
@@ -22,7 +23,8 @@
 "react-dom": "https://esm.sh/react-dom@18.3.1?external=react",
 "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?external=react",
 "lucide-react": "https://esm.sh/lucide-react@0.383.0?external=react",
-"@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
+"@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4",
+"leaflet": "https://esm.sh/leaflet@1.9.4"
 } }
 </script>
 <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
@@ -38,8 +40,10 @@ import {
 Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
 Camera, Sparkles, Check, Plus, Copy, Trash2, Star, ChevronDown, BookOpen,
 CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote,
-X, Map as MapIcon, Pencil
+X, Map as MapIcon, Pencil, Route
 } from "lucide-react";
+import * as Lns from "leaflet";
+const L = Lns.default || Lns;
 
 /* ============================== SUPABASE ============================== */
 
@@ -70,6 +74,14 @@ Bordeaux:   { lat: 44.8378, lon: -0.5792 },
 Copenhagen: { lat: 55.6761, lon: 12.5683 },
 London:     { lat: 51.5074, lon: -0.1278 },
 };
+
+// Ordered stops for the Tour recap journey map (the European leg, in travel order).
+const RECAP_STOPS = [
+{ name: "Paris",      lat: 48.8566, lon: 2.3522 },
+{ name: "Bordeaux",   lat: 44.8378, lon: -0.5792 },
+{ name: "Copenhagen", lat: 55.6761, lon: 12.5683 },
+{ name: "London",     lat: 51.5074, lon: -0.1278 },
+];
 
 // Curated city hero images (Wikimedia Commons, hotlinked). Transit days have no
 // entry and fall back to the plain hero. Swap a URL here to change a city's hero.
@@ -645,6 +657,7 @@ Couldn't load the latest trip data. Showing what's on this device — tap to ret
 {tab === "days" && <Days {...ctx} />}
 {tab === "journal" && <Journal {...ctx} stats={{ wines, meals, rated, bestMeal }} />}
 {tab === "explore" && <Explore {...ctx} />}
+{tab === "tour" && <TripRecap {...ctx} />}
 </main>
 
 {toast && <div className="toast">{toast}</div>}
@@ -655,6 +668,7 @@ Couldn't load the latest trip data. Showing what's on this device — tap to ret
 { id:"days", label:"Days", Icon:CalendarDays },
 { id:"journal", label:"Journal", Icon:BookOpen },
 { id:"explore", label:"Explore", Icon:Compass },
+{ id:"tour", label:"Tour", Icon:Route },
 ].map(({ id, label, Icon }) => (
 <button key={id} className={"tab" + (tab === id ? " active" : "")} onClick={() => setTab(id)}>
 <Icon size={20} strokeWidth={tab === id ? 2.2 : 1.7} />
@@ -1421,6 +1435,102 @@ return (
 );
 }
 
+/* ============================== TOUR (recap / souvenir) ============================== */
+
+// Leaflet journey map. Uses circle markers + a dashed route line (no marker image
+// assets, so nothing 404s). Wrapped in try/catch so a CDN hiccup never breaks the app.
+function TripMap({ stops }) {
+const ref = useRef(null);
+const mapRef = useRef(null);
+useEffect(() => {
+if (!ref.current || mapRef.current) return;
+if (!L || !L.map) return;
+try {
+const map = L.map(ref.current, { scrollWheelZoom: false, zoomControl: true, attributionControl: true });
+mapRef.current = map;
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO',
+}).addTo(map);
+const latlngs = stops.map(s => [s.lat, s.lon]);
+L.polyline(latlngs, { color: "#1F4DE6", weight: 3, opacity: .85, dashArray: "6,9" }).addTo(map);
+stops.forEach((s, i) => {
+L.circleMarker([s.lat, s.lon], { radius: 7, color: "#fff", weight: 2.5, fillColor: "#1F4DE6", fillOpacity: 1 })
+.addTo(map).bindTooltip(`${i + 1}. ${s.name}`, { direction: "top", offset: [0, -6] });
+});
+map.fitBounds(latlngs, { padding: [34, 34] });
+setTimeout(() => { try { map.invalidateSize(); map.fitBounds(latlngs, { padding: [34, 34] }); } catch (e) {} }, 250);
+} catch (e) { /* leave the empty box; the rest of the recap still renders */ }
+return () => { try { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } } catch (e) {} };
+}, []);
+return <div className="tripmap" ref={ref} />;
+}
+
+function TripRecap(ctx) {
+const { state } = ctx;
+const [viewer, setViewer] = useState(null);
+const journal = state.journal || [];
+const meals = journal.filter(j => j.type === "Meal");
+const wines = journal.filter(j => j.type === "Wine");
+const score = j => (j.you || 0) + (j.her || 0);
+const bestMeal = [...meals].sort((a, b) => score(b) - score(a)).find(j => score(j) > 0);
+const bestWine = [...wines].sort((a, b) => score(b) - score(a)).find(j => score(j) > 0);
+const allPhotos = journal.flatMap(j => (j.photos || []));
+const euro = ITINERARY.filter(d => d.city !== "Transit" && d.country !== "Australia");
+const cities = [...new Set(euro.map(d => d.city))];
+const countries = [...new Set(euro.map(d => d.country))];
+const today = todayIndex();
+const dayNow = Math.min(today + 1, TRIP.total);
+const ended = today >= ITINERARY.length - 1;
+
+const renderBest = (j, label) => {
+const Ic = TYPE_META[j.type].icon;
+return (
+<div className="card bestcard">
+<div className="jcard-icon" style={{ color: TYPE_META[j.type].color, background: TYPE_META[j.type].bg }}><Ic size={16} /></div>
+<div className="bestcard-body">
+<div className="muted xs">{label}</div>
+<div className="jcard-title">{j.title}{j.vintage ? <span className="vint"> {j.vintage}</span> : ""}</div>
+{(j.region || j.city) && <div className="muted xs">{[j.region, j.city].filter(Boolean).join(" · ")}</div>}
+<div className="jcard-rate"><MiniStars label="You" v={j.you} /><MiniStars label="H" v={j.her} /></div>
+</div>
+</div>
+);
+};
+
+return (
+<div className="page">
+<div className="recaphero">
+<div className="recaphero-kicker">EUROPE · JUNE 2026</div>
+<div className="recaphero-title">Le Grand Tour</div>
+<div className="recaphero-route"><Route size={13} /> Sydney → Paris → Bordeaux → Copenhagen → London</div>
+<div className="recaphero-dates">4 – 22 June 2026 · 19 days · {ended ? "trip complete" : `day ${dayNow}`}</div>
+</div>
+
+<TripMap stops={RECAP_STOPS} />
+<div className="recap-cap">The European leg — four cities, home from Sydney</div>
+
+<div className="ministats"><Stat label="Days" value={19} /><Stat label="Cities" value={cities.length} /><Stat label="Countries" value={countries.length} /></div>
+<div className="ministats"><Stat label="Meals" value={meals.length} accent /><Stat label="Wines" value={wines.length} accent /><Stat label="Photos" value={allPhotos.length} accent /></div>
+
+{(bestMeal || bestWine) && <div className="section-label">The best of it</div>}
+{bestMeal && renderBest(bestMeal, "Top meal")}
+{bestWine && renderBest(bestWine, "Top wine")}
+
+{allPhotos.length > 0 && (
+<>
+<div className="section-label">Photo highlights</div>
+<div className="photogrid recapgrid">
+{allPhotos.map((p, i) => <button key={p.id || i} onClick={() => setViewer({ photos: allPhotos, index: i })}><img src={p.src} alt="Trip memory" loading="lazy" /></button>)}
+</div>
+</>
+)}
+
+{journal.length === 0 && <div className="muted sm empty pad">Your recap fills in here as you log meals, wines and moments along the way.</div>}
+{viewer && <PhotoViewer photos={viewer.photos} index={viewer.index} onClose={() => setViewer(null)} />}
+</div>
+);
+}
+
 /* ============================== SHARED UI ============================== */
 
 // Shared iOS-style bottom sheet. Both the journal entry editor and the place
@@ -1745,6 +1855,20 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .trayrow-actions{display:flex;align-items:center;gap:4px;flex:none;}
 .sortbtn{display:inline-flex;align-items:center;gap:6px;background:var(--powder);color:var(--accent);border-radius:0;padding:7px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}
 .sortbtn:disabled{opacity:.6;}
+/* ===== Tour recap ===== */
+.recaphero{background:linear-gradient(135deg,#1F4DE6 0%,#3A63FF 100%);color:#fff;border-radius:22px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow);}
+.recaphero-kicker{font-size:11px;font-weight:700;letter-spacing:.08em;opacity:.85;}
+.recaphero-title{font-family:var(--serif);font-size:30px;font-weight:800;letter-spacing:-.02em;margin-top:4px;line-height:1.05;}
+.recaphero-route{display:flex;align-items:center;gap:7px;font-size:13px;margin-top:14px;opacity:.96;line-height:1.4;font-weight:500;}
+.recaphero-route svg{flex:none;opacity:.9;}
+.recaphero-dates{font-size:12.5px;opacity:.82;margin-top:7px;}
+.tripmap{position:relative;z-index:0;height:280px;border-radius:18px;overflow:hidden;box-shadow:var(--shadow);background:var(--fill);}
+.tripmap .leaflet-container{height:100%;width:100%;font-family:var(--sans);background:var(--fill);}
+.tripmap .leaflet-control-attribution{font-size:9px;}
+.recap-cap{font-size:12px;color:var(--muted);text-align:center;margin:10px 0 16px;}
+.bestcard{display:flex;gap:13px;align-items:flex-start;}
+.bestcard-body{flex:1;min-width:0;}
+.recapgrid{grid-template-columns:repeat(3,1fr);}
 `}</style>
 );
 }
