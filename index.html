@@ -40,7 +40,7 @@ import {
 Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
 Camera, Sparkles, Check, Plus, Copy, Trash2, Star, ChevronDown, BookOpen,
 CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote,
-X, Map as MapIcon, Pencil, Route
+X, Map as MapIcon, Pencil, Route, Share2
 } from "lucide-react";
 import * as Lns from "leaflet";
 const L = Lns.default || Lns;
@@ -553,6 +553,12 @@ const localPrefs = useRef({ weather:{}, planDone:{}, planAdd:{}, hotels:{} });
 
 useEffect(() => {
 try { const v = localStorage.getItem("euro26:prefs"); if (v) { const p = JSON.parse(v); localPrefs.current = p; setState(s => ({ ...s, ...p })); } } catch (e) {}
+// Hydrate last-loaded SHARED data (public-read only) so content shows instantly
+// on launch and survives a dropped connection. Photos keep their remote URLs.
+try {
+const c = JSON.parse(localStorage.getItem("euro26:shared") || "null");
+if (c && Array.isArray(c.journal)) setState(s => ({ ...s, journal: c.journal, exploreAdded: c.exploreAdded || s.exploreAdded, exploreStatus: c.exploreStatus || s.exploreStatus }));
+} catch (e) {}
 }, []);
 const persistPrefs = (next) => {
 const prefs = { weather: next.weather, planDone: next.planDone, planAdd: next.planAdd, hotels: next.hotels };
@@ -579,6 +585,8 @@ const shared = await loadAll();
 let priv = { privateNotes: [], inbox: [] };
 if (session) { priv = await loadPrivateNotes(); }
 setState(s => ({ ...s, ...localPrefs.current, ...shared, ...priv }));
+// Cache the public-read data only (never private notes) for instant/offline display.
+try { localStorage.setItem("euro26:shared", JSON.stringify({ journal: shared.journal, exploreAdded: shared.exploreAdded, exploreStatus: shared.exploreStatus })); } catch (e) {}
 setStale(false);
 setLoaded(true);
 } catch (e) { setStale(true); setLoaded(true); }
@@ -607,6 +615,14 @@ const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 1800); };
 const copy = (txt, label) => {
 try { navigator.clipboard.writeText(txt); flash((label || "Copied") + " copied"); }
 catch { flash("Copy failed"); }
+};
+// Share the trip: native share sheet where available, otherwise copy the link.
+const share = async () => {
+const url = (typeof location !== "undefined") ? location.href : "";
+try {
+if (navigator.share) { await navigator.share({ title: "Le Grand Tour", text: "Follow our European trip", url }); }
+else { await navigator.clipboard.writeText(url); flash("Trip link copied"); }
+} catch (e) { /* user dismissed the share sheet — ignore */ }
 };
 const signOut = async () => { await supabase.auth.signOut(); setState(emptyState); setLoaded(false); setViewerMode(false); };
 const setLocal = (updater) => setState(s => { const next = typeof updater === "function" ? updater(s) : { ...s, ...updater }; persistPrefs(next); return next; });
@@ -639,11 +655,14 @@ return (
 <div className="progress"><div className="progress-fill" style={{ width: `${((tIndex + 1) / TRIP.total) * 100}%` }} /></div>
 <div className="syncrow">
 <span className={"syncnote" + (!online ? " warn" : "")}>
-{!online ? "offline — changes paused" : session ? "Signed in · shared trip sync on" : "Viewer mode · sign in to edit"}
+{!online ? "offline — showing saved trip" : session ? "Signed in · shared trip sync on" : "Viewer mode · sign in to edit"}
 </span>
+<div className="syncactions">
+<button className="signout" onClick={share}><Share2 size={12} /> Share</button>
 {session
 ? <button className="signout" onClick={signOut}><LogOut size={12} /> Sign out</button>
 : <button className="signout" onClick={() => setViewerMode(false)}>Sign in</button>}
+</div>
 </div>
 {stale && (
 <button className="stalebanner" onClick={refresh}>
@@ -1869,6 +1888,13 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .bestcard{display:flex;gap:13px;align-items:flex-start;}
 .bestcard-body{flex:1;min-width:0;}
 .recapgrid{grid-template-columns:repeat(3,1fr);}
+/* header share + auth actions */
+.syncactions{display:flex;align-items:center;gap:14px;}
+/* gentle page transition on tab switch */
+@media (prefers-reduced-motion:no-preference){
+.page{animation:pagein .26s cubic-bezier(.2,.8,.2,1) both;}
+}
+@keyframes pagein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 `}</style>
 );
 }
