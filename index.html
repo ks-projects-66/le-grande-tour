@@ -1539,7 +1539,7 @@ return (
 <>
 <div className="section-label">Photo highlights</div>
 <div className="photogrid recapgrid">
-{allPhotos.map((p, i) => <button key={p.id || i} onClick={() => setViewer({ photos: allPhotos, index: i })}><img src={p.src} alt="Trip memory" loading="lazy" /></button>)}
+{allPhotos.map((p, i) => <button key={p.id || i} onClick={() => setViewer({ photos: allPhotos, index: i })}><img src={p.src} alt="" loading="lazy" onError={(e) => { const b = e.currentTarget.closest("button"); if (b) b.style.display = "none"; }} /></button>)}
 </div>
 </>
 )}
@@ -1901,6 +1901,14 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 
 createRoot(document.getElementById("root")).render(<App />);
 
+</script>
+<script>
+/* Register the offline service worker (scope: this app). Failures are silent. */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
 </script>
 </body>
 </html>
