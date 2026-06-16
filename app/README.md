@@ -3,7 +3,8 @@
 A self-serve trip companion that anyone can pick up cold: sign up, set up a trip for **any
 destinations, dates and number of travellers**, then use it day by day.
 
-**Live:** https://ks-projects-66.github.io/le-grande-tour/app/
+**App:** https://ks-projects-66.github.io/le-grande-tour/app/
+**Website / landing:** https://ks-projects-66.github.io/le-grande-tour/voyage/ (marketing front door, source in [`../voyage/`](../voyage/))
 
 ## What it does
 

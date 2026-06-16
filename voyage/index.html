@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voyage — plan any trip, anywhere</title>
+<meta name="description" content="Voyage turns any set of destinations and dates into a day-by-day travel companion: itinerary, live weather, time zones, a shared journal, and places to explore. Free.">
+<meta property="og:title" content="Voyage — plan any trip, anywhere">
+<meta property="og:description" content="From the first booking to the last meal — a day-by-day companion for any trip.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#1F4DE6">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%231F4DE6%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
+<style>
+:root{
+--bg:#FFFFFF; --bg2:#F2F5FB; --surface:#FFFFFF; --fill:#EEF1F6;
+--ink:#15161A; --ink2:#54565E; --muted:#8A8D96;
+--accent:#1F4DE6; --accent-d:#163BBD; --powder:#EAF0FF; --powder2:#D9E4FF;
+--line:#E8EBF0;
+--shadow:0 1px 2px rgba(16,24,40,.04),0 8px 30px rgba(16,24,40,.06);
+--shadow-lg:0 20px 60px rgba(31,77,230,.18);
+--sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",system-ui,Segoe UI,Roboto,sans-serif;
+--serif:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;
+--mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:var(--sans);color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;line-height:1.5;}
+a{color:inherit;text-decoration:none;}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px;}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:12px;padding:13px 20px;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:.15s;white-space:nowrap;}
+.btn svg{width:17px;height:17px;}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(31,77,230,.28);}
+.btn-primary:hover{background:var(--accent-d);transform:translateY(-1px);}
+.btn-ghost{background:var(--fill);color:var(--ink);}
+.btn-ghost:hover{background:#E4E8EF;}
+.btn-white{background:#fff;color:var(--accent);}
+.btn-white:hover{transform:translateY(-1px);}
+
+/* ===== nav ===== */
+.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(18px);-webkit-backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid var(--line);}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:64px;}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-weight:700;font-size:20px;letter-spacing:-.02em;}
+.brand .mark{width:30px;height:30px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;}
+.brand .mark svg{width:17px;height:17px;}
+.nav-links{display:flex;align-items:center;gap:30px;}
+.nav-links a.lk{font-size:14.5px;font-weight:500;color:var(--ink2);}
+.nav-links a.lk:hover{color:var(--ink);}
+
+/* ===== hero ===== */
+.hero{position:relative;overflow:hidden;background:radial-gradient(1200px 500px at 80% -10%,#EAF0FF 0%,rgba(234,240,255,0) 60%),linear-gradient(180deg,#FFFFFF 0%,#F7F9FE 100%);}
+.hero-in{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;padding:84px 0 96px;}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--powder);color:var(--accent);font-size:12.5px;font-weight:600;letter-spacing:.01em;padding:7px 13px;border-radius:999px;margin-bottom:22px;}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+h1{font-family:var(--serif);font-size:56px;line-height:1.02;letter-spacing:-.035em;font-weight:700;}
+h1 .grad{background:linear-gradient(120deg,var(--accent),#5B7BFF);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.lede{font-size:19px;color:var(--ink2);margin:22px 0 30px;max-width:30em;}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.cta-note{font-size:13px;color:var(--muted);margin-top:16px;display:flex;align-items:center;gap:7px;}
+.cta-note svg{width:15px;height:15px;color:#1f9d55;}
+
+/* ===== phone mockup ===== */
+.device-wrap{display:flex;justify-content:center;}
+.device{width:300px;background:#0B0B0F;border-radius:42px;padding:11px;box-shadow:var(--shadow-lg);position:relative;}
+.device:before{content:"";position:absolute;top:20px;left:50%;transform:translateX(-50%);width:96px;height:24px;background:#0B0B0F;border-radius:0 0 16px 16px;z-index:3;}
+.screen{background:#F2F2F7;border-radius:32px;overflow:hidden;height:600px;position:relative;}
+.sc-top{padding:26px 18px 12px;background:rgba(242,242,247,.9);}
+.sc-kicker{font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--muted);}
+.sc-h{font-family:var(--serif);font-weight:700;font-size:22px;letter-spacing:-.02em;margin-top:2px;}
+.sc-prog{height:3px;background:#E5E5EA;border-radius:3px;margin-top:12px;}
+.sc-prog i{display:block;height:100%;width:62%;background:var(--accent);border-radius:3px;}
+.sc-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+.sc-card{background:#fff;border-radius:18px;padding:15px;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+.sc-hero-top{display:flex;justify-content:space-between;align-items:flex-start;}
+.sc-date{font-size:11px;color:var(--muted);}
+.sc-city{font-family:var(--serif);font-weight:700;font-size:21px;letter-spacing:-.02em;margin-top:3px;}
+.sc-country{font-size:11px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:4px;}
+.sc-temp{text-align:right;color:var(--accent);}
+.sc-temp b{display:block;font-size:18px;color:var(--ink);}
+.sc-temp span{font-size:10px;color:var(--muted);}
+.sc-lbl{font-size:11px;color:var(--muted);font-weight:600;margin:4px 2px 0;}
+.sc-row{display:flex;align-items:center;gap:11px;padding:7px 2px;font-size:13.5px;}
+.sc-box{width:20px;height:20px;border-radius:50%;background:#E5E5EA;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;}
+.sc-box.on{background:var(--accent);}
+.sc-row.done span{color:var(--muted);text-decoration:line-through;}
+.sc-tag{margin-left:auto;background:var(--powder);color:var(--accent);font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:999px;}
+.sc-tab{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-around;padding:10px 0 18px;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-top:1px solid #ededf2;}
+.sc-tab div{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;color:var(--muted);}
+.sc-tab div.on{color:var(--accent);}
+.sc-tab svg{width:18px;height:18px;}
+
+/* ===== sections ===== */
+section{padding:84px 0;}
+.sec-head{text-align:center;max-width:640px;margin:0 auto 52px;}
+.sec-tag{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);}
+.sec-head h2{font-family:var(--serif);font-size:38px;line-height:1.08;letter-spacing:-.03em;font-weight:700;margin:10px 0 14px;}
+.sec-head p{font-size:17px;color:var(--ink2);}
+.alt{background:var(--bg2);}
+
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+.feat{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;transition:.18s;}
+.feat:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--powder2);}
+.feat .ic{width:44px;height:44px;border-radius:12px;background:var(--powder);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:15px;}
+.feat .ic svg{width:22px;height:22px;}
+.feat h3{font-size:17.5px;font-weight:650;letter-spacing:-.01em;margin-bottom:7px;}
+.feat p{font-size:14.5px;color:var(--ink2);line-height:1.5;}
+
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;counter-reset:s;}
+.step{position:relative;padding:28px 24px;background:var(--surface);border-radius:18px;box-shadow:var(--shadow);}
+.step .n{width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:var(--mono);margin-bottom:16px;}
+.step h3{font-size:18px;font-weight:650;letter-spacing:-.01em;margin-bottom:7px;}
+.step p{font-size:14.5px;color:var(--ink2);}
+
+/* ===== cta band ===== */
+.band{background:linear-gradient(120deg,var(--accent),#3A63FF);border-radius:28px;padding:56px 40px;text-align:center;color:#fff;box-shadow:var(--shadow-lg);}
+.band h2{font-family:var(--serif);font-size:34px;letter-spacing:-.03em;font-weight:700;}
+.band p{font-size:17px;opacity:.92;margin:12px 0 26px;}
+
+/* ===== footer ===== */
+footer{padding:46px 0;border-top:1px solid var(--line);color:var(--muted);}
+.foot-in{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.foot-links{display:flex;gap:22px;font-size:14px;}
+.foot-links a:hover{color:var(--ink);}
+
+@media (max-width:860px){
+.hero-in{grid-template-columns:1fr;gap:8px;padding:54px 0 64px;text-align:center;}
+.hero .lede{margin-left:auto;margin-right:auto;}
+.hero .cta-row,.hero .cta-note{justify-content:center;}
+.device-wrap{margin-top:38px;}
+h1{font-size:42px;}
+.nav-links .lk{display:none;}
+.grid{grid-template-columns:1fr;}
+.steps{grid-template-columns:1fr;}
+.sec-head h2{font-size:30px;}
+section{padding:60px 0;}
+}
+@media (max-width:480px){
+.wrap{padding:0 18px;}
+h1{font-size:35px;}
+.band{padding:40px 22px;}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="./">
+      <span class="mark"><svg viewBox="0 0 180 180" aria-hidden="true"><path d="M50 130 L132 90 L50 50 L50 84 L104 90 L50 96 Z" fill="currentColor"/></svg></span>
+      Voyage
+    </a>
+    <div class="nav-links">
+      <a class="lk" href="#features">Features</a>
+      <a class="lk" href="#how">How it works</a>
+      <a class="btn btn-primary" href="../app/"><i data-lucide="arrow-right"></i> Open app</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-in">
+    <div>
+      <span class="eyebrow"><span class="dot"></span> Plan any trip, anywhere</span>
+      <h1>Every trip,<br><span class="grad">beautifully planned.</span></h1>
+      <p class="lede">From the first booking to the last meal, Voyage turns any set of destinations and dates into a day-by-day companion you’ll actually want to open — with live weather, time zones, a shared journal, and places to explore.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="../app/"><i data-lucide="sparkles"></i> Get started — it’s free</a>
+        <a class="btn btn-ghost" href="#features">See features</a>
+      </div>
+      <div class="cta-note"><i data-lucide="check-circle-2"></i> No credit card · works on any device · add to your home screen</div>
+    </div>
+    <div class="device-wrap">
+      <div class="device">
+        <div class="screen">
+          <div class="sc-top">
+            <div class="sc-kicker">KYOTO · DAY 4 / 12</div>
+            <div class="sc-h">Today</div>
+            <div class="sc-prog"><i></i></div>
+          </div>
+          <div class="sc-body">
+            <div class="sc-card">
+              <div class="sc-hero-top">
+                <div>
+                  <div class="sc-date">Tue 8 Sep</div>
+                  <div class="sc-city">Kyoto</div>
+                  <div class="sc-country"><i data-lucide="globe" style="width:11px;height:11px"></i> Japan</div>
+                </div>
+                <div class="sc-temp"><b>24°</b><span>H26° L18°</span></div>
+              </div>
+            </div>
+            <div class="sc-lbl">PLAN</div>
+            <div class="sc-card" style="padding:8px 14px">
+              <div class="sc-row done"><span class="sc-box on"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span>Fushimi Inari at sunrise</span></div>
+              <div class="sc-row"><span class="sc-box"></span><span>Nishiki Market</span><span class="sc-tag">Quick bite</span></div>
+              <div class="sc-row"><span class="sc-box"></span><span>Kaiseki dinner — Giro Giro</span><span class="sc-tag">Fancy</span></div>
+            </div>
+            <div class="sc-lbl">JOURNAL</div>
+            <div class="sc-card" style="padding:12px 14px">
+              <div style="font-weight:650;font-size:14px">Ippudo ramen</div>
+              <div style="font-size:11px;color:#8A8D96;margin-top:3px">Alex ★★★★★ · Sam ★★★★☆</div>
+            </div>
+          </div>
+          <div class="sc-tab">
+            <div class="on"><i data-lucide="sun"></i>Today</div>
+            <div><i data-lucide="calendar-days"></i>Days</div>
+            <div><i data-lucide="book-open"></i>Journal</div>
+            <div><i data-lucide="compass"></i>Explore</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-tag">Everything in one place</div>
+      <h2>One app, the whole journey</h2>
+      <p>Set it up once and Voyage carries you from planning to the trip itself — and into the memories afterward.</p>
+    </div>
+    <div class="grid">
+      <div class="feat"><div class="ic"><i data-lucide="wand-2"></i></div><h3>Guided setup</h3><p>Name your trip, add your travellers, and drop in each destination with its arrival date. Voyage builds the day-by-day itinerary for you.</p></div>
+      <div class="feat"><div class="ic"><i data-lucide="cloud-sun"></i></div><h3>Live weather</h3><p>Real forecasts for every stop, fetched automatically from each city’s coordinates — so you always know what to pack for the day.</p></div>
+      <div class="feat"><div class="ic"><i data-lucide="clock"></i></div><h3>Time zones &amp; home clock</h3><p>See how far ahead or behind you are, with a live clock for home — perfect for knowing when to call family.</p></div>
+      <div class="feat"><div class="ic"><i data-lucide="star"></i></div><h3>Shared journal</h3><p>Log meals, wines and moments with photos and a star rating per traveller. By the end it’s a diary of the whole trip.</p></div>
+      <div class="feat"><div class="ic"><i data-lucide="compass"></i></div><h3>Explore &amp; map</h3><p>Collect places to eat, see and shop, pin them to a day, and open the whole day’s stops in Google Maps in walking order.</p></div>
+      <div class="feat"><div class="ic"><i data-lucide="lock"></i></div><h3>Private &amp; synced</h3><p>Your trips are tied to your account and sync across every device you sign in on. Logistics and booking refs stay private to you.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-tag">How it works</div>
+      <h2>Up and running in a minute</h2>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h3>Create your account</h3><p>Sign up with an email and password. No card, no setup — you’re in straight away.</p></div>
+      <div class="step"><div class="n">2</div><h3>Set up your trip</h3><p>Add travellers, your home city, and each destination with dates. Voyage geocodes them for weather and time zones.</p></div>
+      <div class="step"><div class="n">3</div><h3>Travel &amp; journal</h3><p>Check off plans, rate every meal and moment, and watch your trip diary build itself day by day.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="band">
+      <h2>Ready to plan your trip?</h2>
+      <p>Free to use. Works on your phone and laptop. Set up your first trip in under a minute.</p>
+      <a class="btn btn-white" href="../app/"><i data-lucide="arrow-right"></i> Open Voyage</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <div class="brand" style="font-size:17px">
+      <span class="mark" style="width:26px;height:26px"><svg viewBox="0 0 180 180" aria-hidden="true"><path d="M50 130 L132 90 L50 50 L50 84 L104 90 L50 96 Z" fill="currentColor"/></svg></span>
+      Voyage
+    </div>
+    <div class="foot-links">
+      <a href="../app/">Open app</a>
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+    </div>
+    <div style="font-size:13px">Plan any trip, anywhere. · <span id="yr"></span></div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  try { lucide.createIcons(); } catch(e) {}
+  document.getElementById("yr").textContent = new Date().getFullYear();
+</script>
+</body>
+</html>

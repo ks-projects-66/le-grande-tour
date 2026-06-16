@@ -583,7 +583,7 @@ return (
 <div className="muted sm">Set up your first trip — any destinations, any dates.</div>
 </div>
 )}
-{trips && trips.map(t => {
+{trips && trips.length > 0 && <div className="cardgrid">{trips.map(t => {
 const range = t.start_date && t.end_date ? `${fmtDate(t.start_date)} – ${fmtDate(t.end_date)}` : "Dates TBC";
 const nights = t.start_date && t.end_date ? daysInclusive(t.start_date, t.end_date) : 0;
 return (
@@ -599,7 +599,7 @@ return (
 <button className="del" onClick={(e) => del(e, t)} aria-label="Delete trip"><Trash2 size={15} /></button>
 </div>
 );
-})}
+})}</div>}
 <button className="primary newtrip" onClick={onNew}><Plus size={16} /> New trip</button>
 </div>
 </div>
@@ -1338,7 +1338,7 @@ try { await db.addPlace(trip.id, place); } catch (e) { flash("Could not save pla
 if (!cityList.length) return <div className="page"><div className="page-h">Explore</div><div className="muted sm empty pad">Add destinations to your trip to start collecting places.</div></div>;
 
 return (
-<div className="page">
+<div className="page wide">
 <div className="page-h">Explore</div>
 <div className="citytabs scrollx">
 {cityList.map(c => <button key={c} className={"citytab" + (city === c ? " on" : "")} onClick={() => { setCity(c); setVibe("All"); setPicker(null); }}>{c}</button>)}
@@ -1351,6 +1351,7 @@ return (
 {byCat.map(g => (
 <div key={g.cat}>
 <div className="section-label">{g.cat}</div>
+<div className="cardgrid">
 {g.items.map(p => {
 const planned = p.plannedDay != null;
 const day = planned ? days[p.plannedDay] : null;
@@ -1375,6 +1376,7 @@ return (
 </div>
 );
 })}
+</div>
 </div>
 ))}
 {adding ? <AddPlace city={city} onCancel={() => setAdding(false)} onAdd={addPlace} />
@@ -1728,6 +1730,32 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .daterow{display:flex;gap:12px;}
 .daterow label{flex:1;display:flex;flex-direction:column;font-size:12px;color:var(--muted);font-weight:600;gap:2px;}
 .daterow .inline-input{width:100%;}
+/* card grids are plain stacks on mobile; become multi-column on desktop */
+.cardgrid{}
+/* ===== desktop / laptop layout ===== */
+@media (min-width:1000px){
+  body{background:linear-gradient(180deg,#EAEEF7 0%,#F4F7FC 100%);}
+  .app{max-width:980px;min-height:100vh;background:var(--bg);box-shadow:0 0 0 1px rgba(16,24,40,.04),0 30px 90px rgba(16,24,40,.10);}
+  .topbar{padding-left:34px;padding-right:34px;}
+  .scroll{padding-bottom:128px;}
+  .scroll.solo{padding-bottom:40px;}
+  .page{max-width:720px;margin:0 auto;padding:24px 24px 8px;}
+  .page.wide{max-width:940px;}
+  .page-h{font-size:34px;}
+  .cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(264px,1fr));gap:12px;align-items:start;}
+  .cardgrid>*{margin-bottom:0 !important;}
+  .daycard{animation:none;}
+  /* floating pill nav, centred to the app */
+  .tabbar{width:auto;max-width:460px;left:50%;transform:translateX(-50%);bottom:22px;border-radius:22px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));box-shadow:0 12px 40px rgba(16,24,40,.18);border:1px solid var(--line);background:rgba(255,255,255,.9);}
+  .tab{padding:6px 16px;}
+  /* keep prominent CTAs from stretching too wide */
+  .primary.newtrip,.addplace{width:auto;min-width:240px;margin-left:auto;margin-right:auto;}
+  .hero{padding:26px;}
+}
+@media (min-width:1280px){
+  .app{max-width:1080px;}
+  .page.wide{max-width:1040px;}
+}
 `}</style>
 );
 }
