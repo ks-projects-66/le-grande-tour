@@ -374,6 +374,20 @@ if (j.error) throw new Error(j.error);
 return j.place || {};
 }
 
+// Asks the same edge function (story mode) to write a short, grounded trip recap
+// from the journal entries. Authenticated users only; key stays server side.
+async function aiStory(entries, trip, accessToken) {
+const r = await fetch(`${SUPABASE_URL}/functions/v1/assistant`, {
+method: "POST",
+headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
+body: JSON.stringify({ mode: "story", entries, trip }),
+});
+if (!r.ok) throw new Error("story request failed");
+const j = await r.json();
+if (j.error) throw new Error(j.error);
+return j.text || "";
+}
+
 // One-time migration of legacy device-only localStorage data into Supabase.
 async function migrateLegacyOnce() {
 try {
@@ -1485,8 +1499,10 @@ return <div className="tripmap" ref={ref} />;
 }
 
 function TripRecap(ctx) {
-const { state } = ctx;
+const { state, canEdit, session, flash } = ctx;
 const [viewer, setViewer] = useState(null);
+const [story, setStory] = useState(() => { try { return JSON.parse(localStorage.getItem("euro26:story") || "null"); } catch (e) { return null; } });
+const [storyBusy, setStoryBusy] = useState(false);
 const journal = state.journal || [];
 const meals = journal.filter(j => j.type === "Meal");
 const wines = journal.filter(j => j.type === "Wine");
@@ -1500,6 +1516,20 @@ const countries = [...new Set(euro.map(d => d.country))];
 const today = todayIndex();
 const dayNow = Math.min(today + 1, TRIP.total);
 const ended = today >= ITINERARY.length - 1;
+
+const genStory = async () => {
+if (!canEdit) { flash("Sign in to write the story"); return; }
+if (!journal.length) return;
+setStoryBusy(true);
+try {
+const entries = journal.map(j => ({ type: j.type, title: j.title, city: j.city, you: j.you, her: j.her, note: j.note }));
+const text = await aiStory(entries, { name: "Le Grand Tour" }, session && session.access_token);
+const obj = { text, n: journal.length };
+setStory(obj);
+try { localStorage.setItem("euro26:story", JSON.stringify(obj)); } catch (e) {}
+} catch (e) { flash("Couldn't write the story"); }
+setStoryBusy(false);
+};
 
 const renderBest = (j, label) => {
 const Ic = TYPE_META[j.type].icon;
@@ -1524,6 +1554,13 @@ return (
 <div className="recaphero-route"><Route size={13} /> Sydney → Paris → Bordeaux → Copenhagen → London</div>
 <div className="recaphero-dates">4 – 22 June 2026 · 19 days · {ended ? "trip complete" : `day ${dayNow}`}</div>
 </div>
+
+{story && story.text && <div className="storycard">{story.text}</div>}
+{canEdit && journal.length > 0 && (
+<button className="storybtn" onClick={genStory} disabled={storyBusy}>
+<Sparkles size={14} /> {storyBusy ? "Writing your story…" : story ? "Rewrite the trip story" : "Write our trip story"}
+</button>
+)}
 
 <TripMap stops={RECAP_STOPS} />
 <div className="recap-cap">The European leg — four cities, home from Sydney</div>
@@ -1888,6 +1925,9 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .bestcard{display:flex;gap:13px;align-items:flex-start;}
 .bestcard-body{flex:1;min-width:0;}
 .recapgrid{grid-template-columns:repeat(3,1fr);}
+.storycard{background:var(--surface);border-radius:18px;padding:17px 19px;margin-bottom:10px;box-shadow:var(--shadow);font-family:var(--serif);font-size:16px;line-height:1.55;color:var(--ink);font-style:italic;border-left:3px solid var(--accent);}
+.storybtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--powder);color:var(--accent);border-radius:14px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-bottom:12px;}
+.storybtn:disabled{opacity:.6;}
 /* header share + auth actions */
 .syncactions{display:flex;align-items:center;gap:14px;}
 /* gentle page transition on tab switch */
