@@ -1,0 +1,30 @@
+City photos used by Le Grand Tour (root hero images) and Voyage (/voyage destinations).
+All sourced from Wikimedia Commons and self-hosted here. Attribution shown in-app
+(root: Tour tab footer; Voyage: under the destinations grid).
+
+paris.jpg
+  Title:   Eiffel Tower and Pont Alexandre III at night
+  Author:  Getfunky Paris
+  Licence: CC BY 2.0  (https://creativecommons.org/licenses/by/2.0/)
+  Source:  https://commons.wikimedia.org/wiki/File:Eiffel_Tower_and_Pont_Alexandre_III_at_night.jpg
+
+bordeaux.jpg
+  Title:   Panorama Place de la Bourse Bordeaux
+  Author:  AirScott
+  Licence: CC BY-SA 4.0  (https://creativecommons.org/licenses/by-sa/4.0/)
+  Source:  https://commons.wikimedia.org/wiki/File:Panorama_Place_de_la_Bourse_Bordeaux.jpg
+
+copenhagen.jpg
+  Title:   Nyhavn, Copenhagen, 20220618 1728 7354
+  Author:  Jakub Hałun
+  Licence: CC BY-SA 4.0  (https://creativecommons.org/licenses/by-sa/4.0/)
+  Source:  https://commons.wikimedia.org/wiki/File:Nyhavn,_Copenhagen,_20220618_1728_7354.jpg
+
+london.jpg
+  Title:   HMS Belfast and Tower Bridge before sunrise
+  Author:  Aleem Yousaf
+  Licence: CC BY-SA 2.0  (https://creativecommons.org/licenses/by-sa/2.0/)
+  Source:  https://commons.wikimedia.org/wiki/File:HMS_Belfast_and_Tower_Bridge_before_sunrise.jpg
+
+Each file is the 1280px-wide Wikimedia thumbnail. To replace one, keep the same
+filename and update this file's attribution to match the new source.

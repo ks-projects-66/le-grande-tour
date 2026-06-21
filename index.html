@@ -83,13 +83,14 @@ const RECAP_STOPS = [
 { name: "London",     lat: 51.5074, lon: -0.1278 },
 ];
 
-// Curated city hero images (Wikimedia Commons, hotlinked). Transit days have no
-// entry and fall back to the plain hero. Swap a URL here to change a city's hero.
+// Curated city hero images, self-hosted under /img (sourced from Wikimedia
+// Commons — see img/CREDITS.txt for authors and licences). Transit days have no
+// entry and fall back to the plain hero. Swap a path here to change a city's hero.
 const CITY_HERO = {
-Paris: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Eiffel_Tower_and_Pont_Alexandre_III_at_night.jpg/1280px-Eiffel_Tower_and_Pont_Alexandre_III_at_night.jpg",
-Bordeaux: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Panorama_Place_de_la_Bourse_Bordeaux.jpg/1280px-Panorama_Place_de_la_Bourse_Bordeaux.jpg",
-Copenhagen: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Nyhavn%2C_Copenhagen%2C_20220618_1728_7354.jpg/1280px-Nyhavn%2C_Copenhagen%2C_20220618_1728_7354.jpg",
-London: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/HMS_Belfast_and_Tower_Bridge_before_sunrise.jpg/1280px-HMS_Belfast_and_Tower_Bridge_before_sunrise.jpg",
+Paris: "img/paris.jpg",
+Bordeaux: "img/bordeaux.jpg",
+Copenhagen: "img/copenhagen.jpg",
+London: "img/london.jpg",
 };
 
 const TZ = {
@@ -1759,6 +1760,7 @@ return (
 )}
 
 {journal.length === 0 && <div className="muted sm empty pad">Your recap fills in here as you log meals, wines and moments along the way.</div>}
+<div className="photo-credit">City hero photos via Wikimedia Commons — Paris: Getfunky Paris (CC BY 2.0) · Bordeaux: AirScott (CC BY-SA 4.0) · Copenhagen: Jakub Hałun (CC BY-SA 4.0) · London: Aleem Yousaf (CC BY-SA 2.0)</div>
 {viewer && <PhotoViewer photos={viewer.photos} index={viewer.index} onClose={() => setViewer(null)} />}
 </div>
 );
@@ -2132,6 +2134,7 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .storycard{background:var(--surface);border-radius:18px;padding:17px 19px;margin-bottom:10px;box-shadow:var(--shadow);font-family:var(--serif);font-size:16px;line-height:1.55;color:var(--ink);font-style:italic;border-left:3px solid var(--accent);}
 .storybtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--powder);color:var(--accent);border-radius:14px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-bottom:12px;}
 .storybtn:disabled{opacity:.6;}
+.photo-credit{font-size:11px;color:var(--muted);line-height:1.5;margin:18px 4px 4px;text-align:center;}
 /* header share + auth actions */
 .syncactions{display:flex;align-items:center;gap:14px;}
 /* gentle page transition on tab switch */
