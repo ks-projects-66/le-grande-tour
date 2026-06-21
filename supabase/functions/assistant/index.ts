@@ -1,10 +1,13 @@
 // Le Grand Tour "assistant" Edge Function (Gemini-backed).
 // Source of record for the deployed function (project bsbuhkzdebqobkpxtivb).
 //
-// Two modes, both requiring a signed-in trip user (the Gemini key stays server side):
+// Three modes, all requiring a signed-in trip user (the Gemini key stays server side):
 //   • place  — turn a raw note OR a pasted link into one structured place. Links are
 //              read via Gemini's url_context tool; falls back to a schema-only call.
 //   • story  — write a short, grounded trip recap from the supplied journal entries.
+//   • doc    — read a PDF/photo of a ticket, booking or itinerary (sent as inline_data)
+//              and extract its logistics into structured items. Deliberately city-
+//              agnostic so the white-label /app can use it for any trip.
 //
 // Notes: gemini-2.5-flash is a thinking model, so thinking is disabled (thinkingBudget 0)
 // to keep latency/cost down and leave the output budget for the actual response.
@@ -17,7 +20,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const CATS = ["Eat & Drink", "See & Do", "Shop"];
-const TAGS = ["Fancy dinner", "Long lunch", "Quick bite", "Coffee & cake", "Wine bar", "Cheap & cheerful", "Sweet treat", "Must-see", "Hidden gem", "Golden hour", "Browse & buy"];
+const TAGS = ["Fancy dinner", "Long lunch", "Quick bite", "Coffee & cake", "Wine bar", "Cheap & cheerful", "Sweet treat", "Must-see", "Hidden gem", "Golden hour", "Museum", "Gallery", "Historic site", "Sightseeing", "Winery", "Browse & buy"];
 const CITIES = ["Paris", "Bordeaux", "Copenhagen", "London"];
 const MODEL = "gemini-2.5-flash";
 
@@ -28,6 +31,31 @@ function json(o: unknown, status = 200) {
 const SYS_PLACE = `You convert a traveller's raw note or pasted link into ONE structured place for a trip app covering Paris, Bordeaux, Copenhagen, London. Rules: choose category strictly from the allowed list; choose tag strictly from the allowed list; set city only if clearly implied, else leave empty; if the input is a URL, use the linked page's actual content to fill the fields; NEVER invent facts (hours, prices, founding dates, ratings, claims) that are not present in the input or the linked page; the note field should only restate what the source actually says, concise, Australian English, no em dashes; if a field is unknown leave it empty. Respond with a single JSON object only, no markdown.`;
 
 const SYS_STORY = `You write a short, warm recap of a couple's trip for their travel app. Australian English, second person plural ("you"). 2 to 3 short sentences, about 60 words, one paragraph. Base it ONLY on the supplied journal entries. Keep each place in the exact city it is listed under; do NOT move places between cities, and do NOT add landmarks, quotes, dishes or facts that are not in the entries. Warm and personal but grounded and accurate. No em dashes, no quotation marks, no lists, no headings.`;
+
+// Logistics types the client understands (PRIVATE_TYPE_ORDER in both apps).
+const PRIV_TYPES = ["hotel", "flight", "train", "ticket", "reminder", "note"];
+
+const SYS_DOC = `You read a travel document supplied as a PDF or image (a ticket, boarding pass, booking confirmation, hotel reservation or itinerary) and extract its logistics into structured items for a trip app. Rules: extract ONLY what the document actually states; NEVER invent or guess times, dates, confirmation numbers, addresses, gates or prices that are not present; choose type strictly from the allowed list; title is a short human label such as "Flight to Copenhagen", "Hotel Sanders" or "Eurostar to London"; body holds the key details a traveller needs at a glance (date, times, terminal or platform, address, room) in a compact single block, Australian English, no em dashes; ref holds the single most useful reference (booking reference, PNR, confirmation or seat number) or empty; if the document holds several bookings return one item for each; if nothing travel-related is found return an empty items array. Respond with a single JSON object only, no markdown.`;
+
+const DOC_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: PRIV_TYPES },
+          title: { type: "string" },
+          body: { type: "string" },
+          ref: { type: "string" },
+        },
+        required: ["type", "title"],
+      },
+    },
+  },
+  required: ["items"],
+};
 
 const PLACE_SCHEMA = {
   type: "object",
@@ -96,6 +124,35 @@ Deno.serve(async (req: Request) => {
       const txt = extractText(g);
       if (!txt) return json({ error: "no result", detail: g?.error?.message || null }, 502);
       return json({ text: txt });
+    }
+
+    // ---- DOC MODE: a ticket/booking/itinerary file -> structured logistics ----
+    if (mode === "doc") {
+      const data = (bodyIn?.data || "").toString();
+      const mimeType = (bodyIn?.mimeType || "").toString();
+      if (!data || !mimeType) return json({ error: "no document" }, 400);
+      const payload = {
+        system_instruction: { parts: [{ text: SYS_DOC }] },
+        contents: [{ parts: [
+          { inline_data: { mime_type: mimeType, data } },
+          { text: "Extract every booking or logistics item from this document." },
+        ] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: DOC_SCHEMA, temperature: 0.1, maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
+      };
+      const g = await callGemini(K, payload);
+      const txt = extractText(g);
+      if (!txt) return json({ error: "no result", detail: g?.error?.message || null }, 502);
+      let parsed: any;
+      try { parsed = parseLooseJson(txt); } catch { return json({ error: "unparseable model output" }, 502); }
+      const raw = Array.isArray(parsed?.items) ? parsed.items : [];
+      // Coerce defensively: keep only string fields, force type into the allowed set.
+      const items = raw.slice(0, 25).map((it: any) => ({
+        type: PRIV_TYPES.includes(it?.type) ? it.type : "note",
+        title: (it?.title || "").toString().slice(0, 120),
+        body: (it?.body || "").toString().slice(0, 600),
+        ref: (it?.ref || "").toString().slice(0, 80),
+      })).filter((it: any) => it.title);
+      return json({ items });
     }
 
     // ---- PLACE MODE: raw note or link -> one structured place ----
