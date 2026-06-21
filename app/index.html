@@ -1959,6 +1959,9 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
   .app{max-width:1080px;}
   .page.wide{max-width:1040px;}
 }
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important;}
+}
 `}</style>
 );
 }

@@ -2142,6 +2142,27 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .page{animation:pagein .26s cubic-bezier(.2,.8,.2,1) both;}
 }
 @keyframes pagein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+/* ===== desktop / laptop layout — a contained shell, not a stretched phone.
+   Keeps Le Grand Tour's flat, sharp identity (no rounded chrome added). ===== */
+@media (min-width:1000px){
+  body{background:linear-gradient(180deg,#EAEEF7 0%,#F4F7FC 100%);}
+  .app{max-width:940px;background:var(--bg);box-shadow:0 0 0 1px rgba(16,24,40,.04),0 30px 90px rgba(16,24,40,.10);}
+  .topbar{padding-left:34px;padding-right:34px;}
+  .scroll{padding-bottom:120px;}
+  .page{max-width:700px;margin:0 auto;padding:24px 24px 8px;}
+  .page-h{font-size:34px;}
+  .daycard{animation:none;}
+  .recapgrid{grid-template-columns:repeat(4,1fr);}
+  .tabbar{width:100%;max-width:940px;left:50%;transform:translateX(-50%);}
+  .hero{padding:26px;}
+}
+@media (min-width:1280px){
+  .app{max-width:1040px;}
+  .tabbar{max-width:1040px;}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important;}
+}
 `}</style>
 );
 }
