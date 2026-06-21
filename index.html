@@ -221,6 +221,107 @@ const s = (q || "").trim();
 return s ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s)}` : null;
 }
 
+/* ============================== CURRENCY (FX) ============================== */
+
+// Country (display name, as returned by geocoding) -> ISO currency. Keeps FX
+// white-label: any geocoded country resolves the same way; unknown countries
+// simply hide the FX chip rather than guess a rate.
+const CCY = {
+"Australia":{code:"AUD",sym:"$"},"United Kingdom":{code:"GBP",sym:"£"},"United States":{code:"USD",sym:"$"},
+"France":{code:"EUR",sym:"€"},"Germany":{code:"EUR",sym:"€"},"Italy":{code:"EUR",sym:"€"},"Spain":{code:"EUR",sym:"€"},
+"Netherlands":{code:"EUR",sym:"€"},"Belgium":{code:"EUR",sym:"€"},"Ireland":{code:"EUR",sym:"€"},"Portugal":{code:"EUR",sym:"€"},
+"Austria":{code:"EUR",sym:"€"},"Greece":{code:"EUR",sym:"€"},"Finland":{code:"EUR",sym:"€"},"Croatia":{code:"EUR",sym:"€"},
+"Denmark":{code:"DKK",sym:"kr"},"Sweden":{code:"SEK",sym:"kr"},"Norway":{code:"NOK",sym:"kr"},"Switzerland":{code:"CHF",sym:"CHF"},
+"Czechia":{code:"CZK",sym:"Kč"},"Czech Republic":{code:"CZK",sym:"Kč"},"Poland":{code:"PLN",sym:"zł"},"Hungary":{code:"HUF",sym:"Ft"},
+"Japan":{code:"JPY",sym:"¥"},"China":{code:"CNY",sym:"¥"},"Thailand":{code:"THB",sym:"฿"},"Singapore":{code:"SGD",sym:"$"},
+"Malaysia":{code:"MYR",sym:"RM"},"Indonesia":{code:"IDR",sym:"Rp"},"India":{code:"INR",sym:"₹"},"Vietnam":{code:"VND",sym:"₫"},
+"New Zealand":{code:"NZD",sym:"$"},"Canada":{code:"CAD",sym:"$"},"Mexico":{code:"MXN",sym:"$"},"Brazil":{code:"BRL",sym:"R$"},
+"United Arab Emirates":{code:"AED",sym:"AED"},"Turkey":{code:"TRY",sym:"₺"},"South Korea":{code:"KRW",sym:"₩"},"Hong Kong":{code:"HKD",sym:"$"},
+"South Africa":{code:"ZAR",sym:"R"},"Iceland":{code:"ISK",sym:"kr"},
+};
+function ccyOf(country){ return (country && CCY[country]) || null; }
+function symOf(code){ const x = Object.values(CCY).find(c => c.code === code); return x ? x.sym : ""; }
+function fmtRate(v){ if(v==null) return "—"; if(v>=100) return Math.round(v).toLocaleString("en-AU"); if(v>=10) return v.toFixed(1); return v.toFixed(2); }
+function fmtMoney(v){ if(!isFinite(v)) v=0; return (Math.round(v*100)/100).toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+// Live FX rates from open.er-api.com (keyless, CORS). Cached in localStorage and
+// shown instantly; refreshed in the background when older than a day. Returns
+// null until any rates (cached or live) exist, so callers degrade gracefully.
+function useRates(homeCode){
+const [data, setData] = useState(() => { try { return JSON.parse(localStorage.getItem("fx:"+homeCode) || "null"); } catch(e){ return null; } });
+useEffect(() => {
+if (!homeCode) return;
+let on = true, cached = null;
+try { cached = JSON.parse(localStorage.getItem("fx:"+homeCode) || "null"); } catch(e){}
+if (cached && cached.base === homeCode) setData(cached);
+if (cached && cached.base === homeCode && (Date.now() - (cached.fetchedAt||0) < 24*3600*1000)) return;
+fetch("https://open.er-api.com/v6/latest/"+homeCode)
+.then(r => r.ok ? r.json() : null)
+.then(j => { if (on && j && j.rates) { const obj = { base: homeCode, rates: j.rates, date: j.time_last_update_utc || "", fetchedAt: Date.now() }; setData(obj); try { localStorage.setItem("fx:"+homeCode, JSON.stringify(obj)); } catch(e){} } })
+.catch(() => {});
+return () => { on = false; };
+}, [homeCode]);
+if (!data || data.base !== homeCode) return null;
+return { ...data, stale: (Date.now() - (data.fetchedAt||0) > 36*3600*1000) };
+}
+
+// Small FX chip for the current region (home -> local). Tap opens a converter
+// sheet. Hidden when there is no home currency, no local currency, or they match.
+function FxChip({ homeCode, homeSym, country, tripCountries }){
+const local = ccyOf(country);
+const rates = useRates(homeCode);
+const [open, setOpen] = useState(false);
+if (!homeCode || !local || local.code === homeCode) return null;
+const rate = rates && rates.rates ? rates.rates[local.code] : null;
+return (
+<>
+<button className="fxchip" onClick={() => setOpen(true)} aria-label="Currency converter">
+<span className="fxchip-rate">{homeSym}1 <span className="fxchip-arr">→</span> {local.sym}{fmtRate(rate)}</span>
+<span className="fxchip-code">{homeCode} → {local.code}</span>
+</button>
+{open && <FxSheet homeCode={homeCode} homeSym={homeSym} local={local} rates={rates} tripCountries={tripCountries} onClose={() => setOpen(false)} />}
+</>
+);
+}
+
+function FxSheet({ homeCode, homeSym, local, rates, tripCountries, onClose }){
+const [amt, setAmt] = useState("100");
+const [flip, setFlip] = useState(false); // false: home -> local, true: local -> home
+const rate = rates && rates.rates ? rates.rates[local.code] : null;
+const n = parseFloat(amt) || 0;
+const out = rate ? (flip ? n / rate : n * rate) : 0;
+const toSym = flip ? homeSym : local.sym;
+const fromCode = flip ? local.code : homeCode, toCode = flip ? homeCode : local.code;
+const others = Array.from(new Set((tripCountries||[]).map(c => { const x = ccyOf(c); return x ? x.code : null; }).filter(Boolean)))
+.filter(code => code !== homeCode && code !== local.code)
+.map(code => ({ code, sym: symOf(code) }));
+return createPortal(
+<div className="sheet" onClick={onClose}>
+<div className="sheetcard" onClick={e => e.stopPropagation()}>
+<div className="sheethead">
+<div className="sheettitle">Currency</div>
+<button className="sheetx" onClick={onClose} aria-label="Close"><X size={16} /></button>
+</div>
+<div className="fxbig">{homeSym}1 = {local.sym}{fmtRate(rate)} <span className="fxbig-code">{local.code}</span></div>
+<div className="fxconv">
+<label className="fxconv-cell"><span className="fxconv-code">{fromCode}</span><input className="fxconv-input" type="number" inputMode="decimal" value={amt} onChange={e => setAmt(e.target.value)} /></label>
+<button className="fxswap" onClick={() => setFlip(f => !f)} aria-label="Swap direction">⇄</button>
+<div className="fxconv-cell out"><span className="fxconv-code">{toCode}</span><div className="fxconv-out">{toSym}{fmtMoney(out)}</div></div>
+</div>
+<div className="muted xs fxnote">Indicative mid-market rate{rates && rates.date ? ` · ${rates.date}` : ""}{rates && rates.stale ? " · may be out of date offline" : ""}</div>
+{others.length > 0 && (
+<>
+<div className="section-label">Other regions on this trip</div>
+<div className="fxlist">
+{others.map(o => <div className="fxlistrow" key={o.code}><span className="fxlistrow-code">{o.code}</span><span className="fxlistrow-val">{homeSym}1 ≈ {o.sym}{fmtRate(rates && rates.rates ? rates.rates[o.code] : null)}</span></div>)}
+</div>
+</>
+)}
+</div>
+</div>
+, document.body);
+}
+
 /* ============================== STORAGE (Supabase) ============================== */
 
 const LEGACY_KEY = "euro26:v1";
@@ -924,6 +1025,8 @@ value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather,
 </div>
 
 {tzHere.ahead !== 0 && <HomeClock />}
+
+<FxChip homeCode="AUD" homeSym="$" country={d.country} tripCountries={ITINERARY.map(x => x.country)} />
 
 {toRate > 0 && canEdit && (
 <button className="nudge" onClick={() => setTab("journal")}>
@@ -1821,6 +1924,27 @@ return (
 .homeclock svg{color:var(--accent);flex:none;}
 .homeclock-l{font-weight:600;color:var(--ink);}
 .homeclock-t{margin-left:auto;font-family:var(--mono);color:var(--ink2);font-variant-numeric:tabular-nums;}
+.fxchip{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:var(--surface);border-radius:0;padding:11px 14px;margin-bottom:12px;box-shadow:var(--shadow);cursor:pointer;font-family:var(--sans);text-align:left;}
+.fxchip:active{transform:scale(.99);}
+.fxchip-rate{font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;}
+.fxchip-arr{color:var(--accent);}
+.fxchip-code{font-size:11px;color:var(--muted);font-weight:600;font-family:var(--mono);}
+.fxbig{font-family:var(--serif);font-size:22px;font-weight:800;letter-spacing:-.02em;margin:4px 0 16px;}
+.fxbig-code{font-size:14px;color:var(--muted);font-weight:600;}
+.fxconv{display:flex;align-items:stretch;gap:9px;}
+.fxconv-cell{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;background:var(--fill);border-radius:0;padding:10px 12px;}
+.fxconv-cell.out{justify-content:center;}
+.fxconv-code{font-size:11px;color:var(--muted);font-weight:700;font-family:var(--mono);}
+.fxconv-input{background:none;font-size:18px;font-weight:600;color:var(--ink);font-family:var(--sans);width:100%;font-variant-numeric:tabular-nums;}
+.fxconv-out{font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;}
+.fxswap{flex:none;width:40px;background:var(--powder);color:var(--accent);border-radius:0;font-size:18px;font-weight:700;cursor:pointer;}
+.fxswap:active{background:var(--powder2);}
+.fxnote{margin-top:10px;}
+.fxlist{display:flex;flex-direction:column;}
+.fxlistrow{display:flex;align-items:center;justify-content:space-between;padding:10px 2px;border-top:1px solid var(--line);font-size:14px;}
+.fxlistrow:first-child{border-top:none;}
+.fxlistrow-code{font-family:var(--mono);font-weight:600;color:var(--ink2);font-size:12.5px;}
+.fxlistrow-val{font-weight:600;color:var(--ink);}
 .hero-cond{font-size:14px;color:var(--ink2);margin-top:16px;}
 .weather-input{margin-top:12px;width:100%;background:var(--fill);color:var(--ink);border-radius:0;padding:11px 13px;font-size:14px;font-family:var(--sans);}
 .weather-input::placeholder{color:var(--muted);}
