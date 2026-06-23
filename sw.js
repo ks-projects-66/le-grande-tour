@@ -12,7 +12,7 @@
  *
  * Bump VERSION to roll the cache.
  */
-const VERSION = "lgt-v2";
+const VERSION = "lgt-v3";
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
