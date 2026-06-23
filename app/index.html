@@ -38,7 +38,7 @@ import {
 Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
 Camera, Sparkles, Check, Plus, Copy, Trash2, Star, ChevronDown, ChevronLeft, BookOpen,
 CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote,
-X, Map as MapIcon, MapPin, Users, Home, Search, Luggage
+X, Map as MapIcon, MapPin, Users, Home, Search, Luggage, Share2, UserPlus, Zap, RefreshCw, ShieldCheck, Link as LinkIcon, Download
 } from "lucide-react";
 
 /* ============================== SUPABASE ============================== */
@@ -77,7 +77,35 @@ Moment:{ icon: Sparkles,       color: "var(--c-moment)", bg: "var(--c-moment-bg)
 /* ============================== HELPERS ============================== */
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+const shareToken = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 const todayCanon = () => new Date().toLocaleDateString("en-CA");
+function appUrl(params = {}) {
+const u = new URL(window.location.href);
+Object.entries(params).forEach(([k, v]) => v == null ? u.searchParams.delete(k) : u.searchParams.set(k, v));
+return u.toString();
+}
+function publicRecapUrl(token) { return appUrl({ recap: token }); }
+function sumRatings(r) { return Object.values(r || {}).reduce((a, b) => a + (b || 0), 0); }
+function buildRecapSnapshot(trip, days, state) {
+const journal = state.journal || [];
+const meals = journal.filter(j => j.type === "Meal");
+const wines = journal.filter(j => j.type === "Wine");
+const bestMeal = [...meals].sort((a, b) => sumRatings(b.ratings) - sumRatings(a.ratings))[0] || null;
+const bestWine = [...wines].sort((a, b) => sumRatings(b.ratings) - sumRatings(a.ratings))[0] || null;
+const allPhotos = journal.flatMap(j => (j.photos || []).map(p => ({ src: p.src, name: p.name || j.title }))).slice(0, 18);
+const cities = [...new Set((days || []).map(d => d.city).filter(Boolean))];
+return {
+trip: { name: trip.name, start_date: trip.start_date, end_date: trip.end_date, travellers: trip.travellers || [] },
+days: (days || []).map(d => ({ date: d.date, city: d.city, disp: d.disp, country: d.country })),
+cities,
+stats: { days: (days || []).length, cities: cities.length, meals: meals.length, wines: wines.length, memories: journal.length },
+bestMeal: bestMeal ? { title: bestMeal.title, city: bestMeal.city, ratings: bestMeal.ratings || {}, note: bestMeal.note || "" } : null,
+bestWine: bestWine ? { title: bestWine.title, city: bestWine.city, ratings: bestWine.ratings || {}, note: bestWine.note || "" } : null,
+photos: allPhotos,
+journal: journal.slice(0, 80).map(j => ({ type: j.type, title: j.title, note: j.note || "", city: j.city || "", day: j.day, ratings: j.ratings || {}, photos: (j.photos || []).slice(0, 4).map(p => ({ src: p.src, name: p.name || "" })) })),
+updated_at: new Date().toISOString(),
+};
+}
 
 function fmtDate(iso) {
 const m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -333,6 +361,53 @@ async loadAllLegs() {
 const { data } = await supabase.from("wl_legs").select("trip_id,city,arrival_date");
 return data || [];
 },
+async claimMemberships(user) {
+if (!user || !user.email) return;
+try {
+await supabase.from("wl_trip_members")
+.update({ user_id: user.id, accepted_at: new Date().toISOString() })
+.is("user_id", null)
+.ilike("invited_email", user.email);
+} catch (e) {}
+},
+async loadMembers(tripId) {
+const { data, error } = await supabase.from("wl_trip_members")
+.select("id,trip_id,user_id,invited_email,display_name,role,accepted_at,created_at")
+.eq("trip_id", tripId)
+.order("created_at", { ascending: true });
+if (error) return { enabled: false, members: [], error };
+return { enabled: true, members: data || [] };
+},
+async inviteMember(tripId, email, role = "editor") {
+const row = { id: uid(), trip_id: tripId, invited_email: email.trim().toLowerCase(), display_name: email.trim(), role };
+const { data, error } = await supabase.from("wl_trip_members").upsert(row, { onConflict: "trip_id,invited_email" }).select().single();
+if (error) throw error;
+return data;
+},
+async removeMember(id) {
+const { error } = await supabase.from("wl_trip_members").delete().eq("id", id);
+if (error) throw error;
+},
+async loadPublicRecap(token) {
+const { data, error } = await supabase.from("wl_recap_shares")
+.select("token,snapshot,updated_at")
+.eq("token", token)
+.single();
+if (error) throw error;
+return data;
+},
+async saveRecapShare(tripId, snapshot) {
+let token = shareToken();
+try {
+const { data: existing } = await supabase.from("wl_recap_shares").select("token").eq("trip_id", tripId).maybeSingle();
+if (existing && existing.token) token = existing.token;
+} catch (e) {}
+const { data, error } = await supabase.from("wl_recap_shares").upsert({
+trip_id: tripId, token, snapshot, updated_at: new Date().toISOString(),
+}, { onConflict: "trip_id" }).select("token").single();
+if (error) throw error;
+return data.token;
+},
 async createTrip(trip, legs) {
 const { data, error } = await supabase.from("wl_trips").insert({
 name: trip.name, home_city: trip.home_city, home_country: trip.home_country,
@@ -480,6 +555,9 @@ return (
 /* ============================== ROOT ============================== */
 
 function App() {
+const publicToken = useMemo(() => new URLSearchParams(window.location.search).get("recap"), []);
+const [publicRecap, setPublicRecap] = useState(null);
+const [publicErr, setPublicErr] = useState("");
 const [session, setSession] = useState(null);
 const [authChecked, setAuthChecked] = useState(false);
 const [view, setView] = useState("trips"); // trips | wizard | trip
@@ -495,8 +573,14 @@ const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
 return () => { sub.subscription.unsubscribe(); };
 }, []);
 
+useEffect(() => {
+if (!publicToken) return;
+db.loadPublicRecap(publicToken).then(r => setPublicRecap(r.snapshot)).catch(() => setPublicErr("This recap link is not available."));
+}, [publicToken]);
+
 const loadTrips = async () => {
 try {
+if (session && session.user) await db.claimMemberships(session.user);
 const [t, allLegs] = await Promise.all([db.loadTrips(), db.loadAllLegs()]);
 const counts = {};
 (allLegs || []).forEach(l => { counts[l.trip_id] = (counts[l.trip_id] || 0) + 1; });
@@ -528,6 +612,7 @@ else setView("trips");
 };
 const signOut = async () => { await supabase.auth.signOut(); };
 
+if (publicToken) return <div className="app"><Style />{publicRecap ? <PublicRecap snapshot={publicRecap} /> : <div className="page"><div className="muted sm empty pad">{publicErr || "Loading recap..."}</div></div>}</div>;
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session) return <div className="app"><Style /><AuthScreen /></div>;
 
@@ -769,6 +854,10 @@ const [loaded, setLoaded] = useState(false);
 const [stale, setStale] = useState(false);
 const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 const [toast, setToast] = useState("");
+const [sync, setSync] = useState({ state: "idle", message: "Synced" });
+const [members, setMembers] = useState({ enabled: null, list: [] });
+const [sharing, setSharing] = useState(false);
+const [capturing, setCapturing] = useState(false);
 const PREFS_KEY = `wl:prefs:${trip.id}`;
 const [state, setState] = useState({ weather: {}, planDone: {}, planAdd: {}, journal: [], exploreStatus: {}, exploreAdded: [], privateNotes: [] });
 const localPrefs = useRef({ weather: {}, planDone: {}, planAdd: {} });
@@ -790,11 +879,29 @@ return () => { window.removeEventListener("online", onUp); window.removeEventLis
 }, []);
 
 const localToast = (m) => { setToast(m); setTimeout(() => setToast(""), 1800); };
+const runSave = async (label, op) => {
+if (!online) { setSync({ state: "queued", message: "Offline, retry when connected" }); throw new Error("offline"); }
+setSync({ state: "saving", message: label || "Saving..." });
+try {
+const result = await op();
+setSync({ state: "synced", message: "Saved" });
+setTimeout(() => setSync(s => s.state === "synced" ? { state: "idle", message: "Synced" } : s), 1600);
+return result;
+} catch (e) {
+setSync({ state: "error", message: "Sync failed, tap retry" });
+throw e;
+}
+};
+const refreshMembers = async () => {
+const r = await db.loadMembers(trip.id);
+setMembers({ enabled: r.enabled, list: r.members || [] });
+return r;
+};
 const refresh = async () => {
 try {
-const data = await db.loadTripData(trip.id);
+const [data] = await Promise.all([db.loadTripData(trip.id), refreshMembers()]);
 setState(s => ({ ...s, ...localPrefs.current, ...data }));
-setStale(false); setLoaded(true);
+setStale(false); setLoaded(true); setSync({ state: "idle", message: "Synced" });
 } catch (e) { setStale(true); setLoaded(true); }
 };
 useEffect(() => { refresh(); }, [trip.id]);
@@ -809,7 +916,7 @@ try { navigator.clipboard.writeText(txt); localToast((label || "Copied") + " cop
 catch { localToast("Copy failed"); }
 };
 
-const ctx = { state, setState, setLocal, tIndex, days, legs, trip, tripCities, total, copy, flash: localToast, uid, setTab, refresh, db, session, user: session.user, canEdit: true };
+const ctx = { state, setState, setLocal, tIndex, days, legs, trip, tripCities, total, copy, flash: localToast, uid, setTab, refresh, refreshMembers, runSave, members, db, session, user: session.user, canEdit: true };
 
 const stats = useMemo(() => {
 const wines = state.journal.filter(j => j.type === "Wine").length;
@@ -827,6 +934,7 @@ return (
 <div className="brand-mid">
 <div className="brandline mid">{trip.name}</div>
 </div>
+<button className="sharetop" onClick={() => setSharing(true)}><Share2 size={14} /> Share</button>
 <div className="daychip">
 <span className="daychip-num">Day {Math.min(tIndex + 1, total)}</span>
 <span className="daychip-of">/ {total}</span>
@@ -834,7 +942,8 @@ return (
 </div>
 <div className="progress"><div className="progress-fill" style={{ width: `${((tIndex + 1) / total) * 100}%` }} /></div>
 <div className="syncrow">
-<span className={"syncnote" + (!online ? " warn" : "")}>{!online ? "offline — changes paused" : "Signed in · synced to your account"}</span>
+<span className={"syncnote" + (!online || sync.state === "error" || sync.state === "queued" ? " warn" : "")}>{!online ? "offline - edits stay local until reconnected" : `${sync.message}${members.enabled === false ? " - collaboration setup needed" : ""}`}</span>
+{sync.state === "error" && <button className="syncbtn" onClick={refresh}><RefreshCw size={11} /> Retry</button>}
 </div>
 {stale && <button className="stalebanner" onClick={refresh}>Couldn't load the latest trip data — tap to retry.</button>}
 </header>
@@ -845,9 +954,13 @@ return (
 {days.length > 0 && tab === "days" && <Days {...ctx} />}
 {tab === "journal" && <Journal {...ctx} stats={stats} />}
 {days.length > 0 && tab === "explore" && <Explore {...ctx} />}
+{days.length > 0 && tab === "recap" && <Recap {...ctx} />}
 </main>
 
 {toast && <div className="toast">{toast}</div>}
+{sharing && <ShareTrip ctx={ctx} onClose={() => setSharing(false)} />}
+{capturing && <FastCapture ctx={ctx} onClose={() => setCapturing(false)} />}
+<button className="capturefab" onClick={() => setCapturing(true)}><Zap size={17} /> Capture</button>
 
 <nav className="tabbar">
 {[
@@ -855,6 +968,7 @@ return (
 { id: "days", label: "Days", Icon: CalendarDays },
 { id: "journal", label: "Journal", Icon: BookOpen },
 { id: "explore", label: "Explore", Icon: Compass },
+{ id: "recap", label: "Recap", Icon: Sparkles },
 ].map(({ id, label, Icon }) => (
 <button key={id} className={"tab" + (tab === id ? " active" : "")} onClick={() => setTab(id)}>
 <Icon size={20} strokeWidth={tab === id ? 2.2 : 1.7} />
@@ -871,14 +985,14 @@ return (
 function useSetStatus(ctx) {
 return (id, patch) => {
 ctx.setState(s => ({ ...s, exploreStatus: { ...s.exploreStatus, [id]: { ...(s.exploreStatus[id] || {}), ...patch } } }));
-ctx.db.upsertStatus(ctx.trip.id, id, patch).catch(() => ctx.flash("Sync failed — retry"));
+ctx.runSave("Saving place status...", () => ctx.db.upsertStatus(ctx.trip.id, id, patch)).catch(() => ctx.flash("Sync failed - retry"));
 };
 }
 
 /* ============================== PRIVATE NOTES ============================== */
 
 function PrivateNotes({ ctx, dayIndex, compact }) {
-const { state, copy, db, setState, flash, trip } = ctx;
+const { state, copy, db, setState, flash, trip, runSave } = ctx;
 const [adding, setAdding] = useState(false);
 const notes = (state.privateNotes || []).filter(n => n.day === dayIndex);
 const groups = PRIVATE_TYPE_ORDER.map(t => ({ type: t, items: notes.filter(n => n.type === t) })).filter(g => g.items.length);
@@ -886,14 +1000,14 @@ const groups = PRIVATE_TYPE_ORDER.map(t => ({ type: t, items: notes.filter(n => 
 const del = async (id) => {
 const prev = state.privateNotes;
 setState(s => ({ ...s, privateNotes: (s.privateNotes || []).filter(n => n.id !== id) }));
-try { await db.deletePrivateNote(id); flash("Note removed"); }
+try { await runSave("Removing note...", () => db.deletePrivateNote(id)); flash("Note removed"); }
 catch (e) { flash("Delete failed"); setState(s => ({ ...s, privateNotes: prev })); }
 };
 const addNote = async (note) => {
 const entry = { id: uid(), day: dayIndex, type: note.type, title: note.title, body: note.body, ref: note.ref, url: "", sort_order: 0 };
 setState(s => ({ ...s, privateNotes: [...(s.privateNotes || []), entry] }));
 setAdding(false);
-try { await db.addPrivateNote(trip.id, entry); flash("Note added"); }
+try { await runSave("Saving note...", () => db.addPrivateNote(trip.id, entry)); flash("Note added"); }
 catch (e) { flash("Could not save note"); }
 };
 
@@ -1097,7 +1211,7 @@ onClick={() => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [i]: (s.planAdd[i
 /* ============================== JOURNAL ============================== */
 
 function Journal(ctx) {
-const { state, setState, tIndex, stats, flash, db, trip, days, session } = ctx;
+const { state, setState, tIndex, stats, flash, db, trip, days, session, runSave } = ctx;
 const setStatus = useSetStatus(ctx);
 const travellers = trip.travellers && trip.travellers.length ? trip.travellers : ["Me"];
 const d = days[tIndex] || { city: "" };
@@ -1117,7 +1231,7 @@ if (!title.trim()) return;
 setBusy(true);
 const entry = { id: uid(), type, title: title.trim(), note: note.trim(), ratings: { ...ratings }, region: region.trim(), vintage: vintage.trim(), city: d.city, day: tIndex, ts: Date.now(), place_id: null, photos: [] };
 try {
-await db.addJournal(trip.id, entry);
+await runSave("Saving journal entry...", () => db.addJournal(trip.id, entry));
 const uploaded = [];
 for (const f of files) { try { uploaded.push(await db.uploadPhoto(trip.id, entry.id, f, session.user.id)); } catch (e) { flash("A photo failed to upload"); } }
 files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
@@ -1132,7 +1246,7 @@ const del = async (id) => {
 if (!window.confirm("Delete this entry? Its photos will be removed too.")) return;
 const prev = state.journal;
 setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== id) }));
-try { await db.deleteJournal(id); } catch (e) { flash("Delete failed"); setState(s => ({ ...s, journal: prev })); }
+try { await runSave("Deleting journal entry...", () => db.deleteJournal(id)); } catch (e) { flash("Delete failed"); setState(s => ({ ...s, journal: prev })); }
 };
 const rated = state.journal.filter(j => Object.values(j.ratings || {}).some(v => v > 0));
 const avg = (name) => {
@@ -1233,7 +1347,7 @@ return (
 /* ============================== EDIT ENTRY ============================== */
 
 function EditEntry({ entry, ctx, travellers, onClose }) {
-const { setState, flash, db, trip, session } = ctx;
+const { setState, flash, db, trip, session, runSave } = ctx;
 const [type, setType] = useState(entry.type);
 const [title, setTitle] = useState(entry.title);
 const [note, setNote] = useState(entry.note || "");
@@ -1249,14 +1363,14 @@ const removePhoto = async (ph) => {
 if (!window.confirm("Remove this photo?")) return;
 setPhotos(ps => ps.filter(p => p.id !== ph.id));
 setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, photos: (j.photos || []).filter(p => p.id !== ph.id) } : j) }));
-try { await db.deletePhoto(ph); flash("Photo removed"); } catch (e) { flash("Could not remove photo"); }
+try { await runSave("Removing photo...", () => db.deletePhoto(ph)); flash("Photo removed"); } catch (e) { flash("Could not remove photo"); }
 };
 const save = async () => {
 if (!title.trim()) return;
 setBusy(true);
 const patch = { id: entry.id, type, title: title.trim(), note: note.trim(), ratings: { ...ratings }, region: region.trim(), vintage: vintage.trim(), city: city.trim() };
 try {
-await db.updateJournal(patch);
+await runSave("Updating journal entry...", () => db.updateJournal(patch));
 const uploaded = [];
 for (const f of files) { try { uploaded.push(await db.uploadPhoto(trip.id, entry.id, f, session.user.id)); } catch (e) { flash("A photo failed to upload"); } }
 files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
@@ -1312,7 +1426,7 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style
 /* ============================== EXPLORE ============================== */
 
 function Explore(ctx) {
-const { state, setState, tIndex, db, flash, days, tripCities, trip } = ctx;
+const { state, setState, tIndex, db, flash, days, tripCities, trip, runSave } = ctx;
 const setStatus = useSetStatus(ctx);
 const here = days[tIndex] ? days[tIndex].city : "";
 const cityList = tripCities.length ? tripCities : (here ? [here] : []);
@@ -1332,7 +1446,7 @@ const byCat = CATS.map(cat => ({ cat, items: shown.filter(p => p.cat === cat) })
 const addPlace = async (place) => {
 setState(s => ({ ...s, exploreAdded: [...(s.exploreAdded || []), place] }));
 setAdding(false);
-try { await db.addPlace(trip.id, place); } catch (e) { flash("Could not save place"); }
+try { await runSave("Saving place...", () => db.addPlace(trip.id, place)); } catch (e) { flash("Could not save place"); }
 };
 
 if (!cityList.length) return <div className="page"><div className="page-h">Explore</div><div className="muted sm empty pad">Add destinations to your trip to start collecting places.</div></div>;
@@ -1405,7 +1519,7 @@ return (
 }
 
 function RatePrompt({ place, ctx, setStatus, travellers }) {
-const { setState, tIndex, flash, db, trip, session } = ctx;
+const { setState, tIndex, flash, db, trip, session, runSave } = ctx;
 const [ratings, setRatings] = useState(() => Object.fromEntries(travellers.map(t => [t, 0])));
 const [note, setNote] = useState("");
 const [files, setFiles] = useState([]);
@@ -1415,7 +1529,7 @@ setBusy(true);
 const day = place.plannedDay != null ? place.plannedDay : tIndex;
 const entry = { id: uid(), type: typeForPlace(place), title: place.name, note: note.trim(), ratings: { ...ratings }, region: "", vintage: "", city: place.city, day, ts: Date.now(), place_id: place.id, photos: [] };
 try {
-await db.addJournal(trip.id, entry);
+await runSave("Saving memory...", () => db.addJournal(trip.id, entry));
 const uploaded = [];
 for (const f of files) { try { uploaded.push(await db.uploadPhoto(trip.id, entry.id, f, session.user.id)); } catch (e) { flash("A photo failed to upload"); } }
 files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
@@ -1434,6 +1548,181 @@ return (
 <PhotoPicker files={files} setFiles={setFiles} flash={flash} />
 <button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving…" : "Save to journal"}</button>
 </Card>
+);
+}
+
+/* ============================== SHARE, CAPTURE, RECAP ============================== */
+
+function OverlaySheet({ title, onClose, children }) {
+return createPortal(
+<div className="sheet" onClick={onClose}>
+<div className="sheetcard" onClick={e => e.stopPropagation()}>
+<div className="sheethead">
+<div className="sheettitle">{title}</div>
+<button className="sheetx" onClick={onClose} aria-label="Close"><X size={16} /></button>
+</div>
+{children}
+</div>
+</div>
+, document.body);
+}
+
+function ShareTrip({ ctx, onClose }) {
+const { members, refreshMembers, runSave, db, trip, flash, copy, days, state } = ctx;
+const [email, setEmail] = useState("");
+const [recapUrl, setRecapUrl] = useState("");
+const invite = async () => {
+const v = email.trim().toLowerCase();
+if (!v || !v.includes("@")) { flash("Add an email address"); return; }
+try {
+await runSave("Inviting traveller...", () => db.inviteMember(trip.id, v));
+await refreshMembers();
+setEmail("");
+flash("Invite ready");
+} catch (e) { flash("Invite could not be saved"); }
+};
+const publish = async () => {
+try {
+const snapshot = buildRecapSnapshot(trip, days, state);
+const token = await runSave("Publishing recap...", () => db.saveRecapShare(trip.id, snapshot));
+const url = publicRecapUrl(token);
+setRecapUrl(url); copy(url, "Recap link");
+} catch (e) { flash("Recap sharing needs the Supabase migration"); }
+};
+return (
+<OverlaySheet title="Share trip" onClose={onClose}>
+<div className="shareblock">
+<div className="sharehero"><ShieldCheck size={17} /><div><strong>Group-first sync</strong><span>Invite a traveller by email. Once they sign in with that address, this trip appears in their account.</span></div></div>
+{members.enabled === false && <div className="autherr">Collaboration tables are not installed yet. Apply the Supabase migration included with this update.</div>}
+<div className="section-label tight"><Users size={13} /> Travellers</div>
+<div className="memberlist">
+{(members.list || []).length === 0 && <div className="muted sm">No invited collaborators yet.</div>}
+{(members.list || []).map(m => (
+<div key={m.id} className="memberrow">
+<div><div className="memberemail">{m.display_name || m.invited_email}</div><div className="muted xs">{m.accepted_at ? "Accepted" : "Invited"} · {m.role || "editor"}</div></div>
+<button className="del" onClick={() => runSave("Removing traveller...", () => db.removeMember(m.id)).then(refreshMembers).catch(() => flash("Could not remove traveller"))}><Trash2 size={13} /></button>
+</div>
+))}
+</div>
+<div className="quickadd">
+<input value={email} placeholder="Traveller email..." onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === "Enter") invite(); }} />
+<button onClick={invite}><UserPlus size={16} /></button>
+</div>
+</div>
+<div className="shareblock">
+<div className="section-label tight"><Sparkles size={13} /> End-of-trip recap</div>
+<button className="primary" onClick={publish}><Share2 size={15} /> Publish recap link</button>
+{recapUrl && <button className="reflink" onClick={() => copy(recapUrl, "Recap link")}><span>{recapUrl}</span><Copy size={12} /></button>}
+</div>
+</OverlaySheet>
+);
+}
+
+function FastCapture({ ctx, onClose }) {
+const { trip, days, tIndex, state, setState, db, session, runSave, flash } = ctx;
+const travellers = trip.travellers && trip.travellers.length ? trip.travellers : ["Me"];
+const day = days[tIndex] || {};
+const [type, setType] = useState("Moment");
+const [title, setTitle] = useState("");
+const [note, setNote] = useState("");
+const [ratings, setRatings] = useState(() => Object.fromEntries(travellers.map(t => [t, 0])));
+const [files, setFiles] = useState([]);
+const [busy, setBusy] = useState(false);
+const save = async () => {
+if (!title.trim()) { flash("Name the memory"); return; }
+setBusy(true);
+const entry = { id: uid(), type, title: title.trim(), note: note.trim(), ratings: { ...ratings }, region: "", vintage: "", city: day.city || "", day: tIndex, ts: Date.now(), place_id: null, photos: [] };
+try {
+const uploaded = await runSave("Saving quick capture...", async () => {
+await db.addJournal(trip.id, entry);
+const pics = [];
+for (const f of files) pics.push(await db.uploadPhoto(trip.id, entry.id, f, session.user.id));
+return pics;
+});
+files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
+entry.photos = uploaded || [];
+setState(s => ({ ...s, journal: [entry, ...s.journal] }));
+flash("Captured");
+onClose();
+} catch (e) { flash("Could not save capture"); }
+setBusy(false);
+};
+return (
+<OverlaySheet title="Quick capture" onClose={onClose}>
+<div className="capturelead"><Zap size={16} /> Photo, name, stars, done.</div>
+<div className="typetabs">
+{Object.keys(TYPE_META).map(tp => {
+const Ic = TYPE_META[tp].icon;
+return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style={type === tp ? { color: TYPE_META[tp].color } : undefined} onClick={() => setType(tp)}><Ic size={15} /> {tp}</button>;
+})}
+</div>
+<input className="inline-input full" placeholder={type === "Moment" ? "What happened..." : "Name..."} value={title} onChange={e => setTitle(e.target.value)} autoFocus />
+<input className="inline-input full" placeholder="One line, optional..." value={note} onChange={e => setNote(e.target.value)} />
+<PhotoPicker files={files} setFiles={setFiles} flash={flash} />
+<div className="ratepair">{travellers.map(t => <RateRow key={t} label={t} value={ratings[t] || 0} onChange={(v) => setRatings(r => ({ ...r, [t]: v }))} />)}</div>
+<button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving..." : "Save capture"}</button>
+</OverlaySheet>
+);
+}
+
+function Recap({ trip, days, state, db, runSave, copy, flash }) {
+const [url, setUrl] = useState("");
+const snapshot = useMemo(() => buildRecapSnapshot(trip, days, state), [trip, days, state]);
+const publish = async () => {
+try {
+const token = await runSave("Publishing recap...", () => db.saveRecapShare(trip.id, snapshot));
+const next = publicRecapUrl(token);
+setUrl(next); copy(next, "Recap link");
+} catch (e) { flash("Recap sharing needs the Supabase migration"); }
+};
+return (
+<div className="page">
+<div className="page-h">Recap</div>
+<div className="recaphero">
+<div className="kicker">PLAN TO MEMORY</div>
+<h2>{trip.name}</h2>
+<div className="muted sm">{snapshot.cities.join(" · ") || "Your route will appear here"}</div>
+</div>
+<div className="ministats">
+<Stat label="Days" value={snapshot.stats.days} />
+<Stat label="Cities" value={snapshot.stats.cities} />
+<Stat label="Memories" value={snapshot.stats.memories} accent />
+</div>
+{(snapshot.bestMeal || snapshot.bestWine) && <div className="section-label">The best of it</div>}
+{snapshot.bestMeal && <Card><div className="bestline"><UtensilsCrossed size={16} /> Best meal</div><div className="jcard-title">{snapshot.bestMeal.title}</div><div className="muted xs">{snapshot.bestMeal.city}</div></Card>}
+{snapshot.bestWine && <Card><div className="bestline"><Wine size={16} /> Best wine</div><div className="jcard-title">{snapshot.bestWine.title}</div><div className="muted xs">{snapshot.bestWine.city}</div></Card>}
+{!!snapshot.photos.length && <><div className="section-label">Photo highlights</div><div className="recapphotos">{snapshot.photos.map((p, i) => <img key={i} src={p.src} alt="" />)}</div></>}
+<Card>
+<div className="sharehero"><LinkIcon size={17} /><div><strong>Zero-install keepsake</strong><span>Publish a web recap anyone can open, with no app install and no login.</span></div></div>
+<button className="primary" onClick={publish}><Share2 size={15} /> Publish recap</button>
+{url && <button className="reflink" onClick={() => copy(url, "Recap link")}><span>{url}</span><Copy size={12} /></button>}
+<button className="ghostbtn block" onClick={() => window.print()}><Download size={15} /> Print or save PDF</button>
+</Card>
+</div>
+);
+}
+
+function PublicRecap({ snapshot }) {
+const s = snapshot || {};
+const stats = s.stats || {};
+return (
+<div className="publicrecap">
+<header className="publichero">
+<div className="brandline">{(s.trip && s.trip.name) || "Voyage recap"}</div>
+<div className="muted sm">{(s.cities || []).join(" · ")}</div>
+</header>
+<div className="ministats">
+<Stat label="Days" value={stats.days || 0} />
+<Stat label="Cities" value={stats.cities || 0} />
+<Stat label="Memories" value={stats.memories || 0} accent />
+</div>
+{(s.bestMeal || s.bestWine) && <div className="section-label">The best of it</div>}
+{s.bestMeal && <Card><div className="bestline"><UtensilsCrossed size={16} /> Best meal</div><div className="jcard-title">{s.bestMeal.title}</div><div className="muted xs">{s.bestMeal.city}</div></Card>}
+{s.bestWine && <Card><div className="bestline"><Wine size={16} /> Best wine</div><div className="jcard-title">{s.bestWine.title}</div><div className="muted xs">{s.bestWine.city}</div></Card>}
+{!!(s.photos || []).length && <><div className="section-label">Photo highlights</div><div className="recapphotos">{s.photos.map((p, i) => <img key={i} src={p.src} alt="" />)}</div></>}
+<div className="section-label">Diary</div>
+{(s.journal || []).slice(0, 24).map((j, i) => <Card key={i}><div className="jcard-title">{j.title}</div><div className="muted xs">{[j.type, j.city].filter(Boolean).join(" · ")}</div>{j.note && <div className="jcard-note">{j.note}</div>}</Card>)}
+</div>
 );
 }
 
@@ -1545,6 +1834,7 @@ return (
 .brandline.mid{font-size:18px;text-align:center;}
 .brand-mid{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .crumb{display:inline-flex;align-items:center;gap:2px;background:none;color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);padding:4px 2px;flex:none;}
+.sharetop{display:inline-flex;align-items:center;gap:5px;background:var(--fill);color:var(--accent);border-radius:12px;padding:8px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans);flex:none;}
 .wiztitle,.wiztitle{font-family:var(--serif);font-weight:700;}
 .wiztitle{font-size:18px;}
 .daychip{display:flex;align-items:baseline;gap:4px;flex:none;}
@@ -1555,6 +1845,7 @@ return (
 .syncrow{display:flex;align-items:center;justify-content:space-between;margin-top:8px;}
 .syncnote{font-size:11px;color:var(--muted);}
 .syncnote.warn{color:#B25000;font-weight:600;}
+.syncbtn{display:inline-flex;align-items:center;gap:4px;background:transparent;color:#B25000;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);}
 .signout{display:inline-flex;align-items:center;gap:5px;background:none;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--sans);padding:2px 0;flex:none;}
 .scroll{flex:1;overflow-y:auto;position:relative;z-index:2;padding-bottom:90px;}
 .scroll.solo{padding-bottom:28px;}
@@ -1649,12 +1940,18 @@ return (
 .del{background:none;color:var(--muted);cursor:pointer;padding:5px;flex:none;transition:.12s;}.del:active{color:var(--ink);transform:scale(.9);}
 .photopicker{margin:7px 0 8px;}.photobtn{display:inline-flex;align-items:center;gap:7px;background:var(--fill);color:var(--ink);border-radius:12px;padding:11px 13px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:7px;}.photobtn input{display:none;}
 .photochips,.photogrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px;}.photochip,.photogrid button{position:relative;aspect-ratio:1;background:var(--fill);border-radius:12px;overflow:hidden;cursor:pointer;}.photochip img,.photogrid img{width:100%;height:100%;object-fit:cover;display:block;}.photochip span{position:absolute;right:4px;top:3px;background:rgba(29,29,31,.72);color:white;border-radius:999px;width:18px;height:18px;line-height:17px;font-size:14px;}
+.recapphotos{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px;}.recapphotos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;background:var(--fill);}
+.capturelead,.sharehero{display:flex;align-items:flex-start;gap:10px;background:var(--powder);color:var(--accent);border-radius:16px;padding:13px 14px;margin-bottom:12px;font-size:14px;font-weight:700;}.sharehero span{display:block;color:var(--ink2);font-size:12.5px;font-weight:500;margin-top:3px;line-height:1.35;}
+.shareblock{margin-bottom:16px;}.section-label.tight{margin-top:10px;}.memberlist{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}.memberrow{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border-radius:14px;padding:12px 13px;box-shadow:var(--shadow);}.memberemail{font-size:14px;font-weight:700;color:var(--ink);}
+.recaphero,.publichero{background:linear-gradient(135deg,#FFFFFF 0%,#EAF0FF 100%);border-radius:22px;padding:22px;margin-bottom:12px;box-shadow:var(--shadow);}.recaphero h2{font-family:var(--serif);font-size:28px;line-height:1.05;letter-spacing:-.025em;margin:6px 0 8px;}.bestline{display:flex;align-items:center;gap:7px;color:var(--accent);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;margin-bottom:8px;}
+.publicrecap{padding:22px 20px 34px;min-height:100vh;background:var(--bg);}
 .viewer{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.86);display:flex;align-items:center;justify-content:center;padding:18px;}.viewer img{max-width:100%;max-height:82vh;border-radius:16px;}.viewer-x{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .viewer-dots{position:absolute;bottom:calc(26px + env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:center;gap:8px;}
 .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);cursor:pointer;padding:0;transition:.15s;}
 .dot.on{background:#fff;}
+.capturefab{position:fixed;right:calc(50% - 246px);bottom:calc(82px + env(safe-area-inset-bottom));z-index:31;display:flex;align-items:center;gap:7px;background:var(--accent);color:#fff;border-radius:999px;padding:12px 15px;font-size:14px;font-weight:800;font-family:var(--sans);box-shadow:var(--shadow-float);cursor:pointer;}
 .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);box-shadow:0 -1px 0 rgba(0,0,0,.04);display:flex;z-index:30;padding:9px 4px calc(9px + env(safe-area-inset-bottom));}
-.tab{flex:1;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 2px;cursor:pointer;color:var(--muted);font-family:var(--sans);transition:.12s;}.tab span{font-size:10.5px;font-weight:500;}.tab.active{color:var(--accent);}.tab:active{transform:scale(.93);}
+.tab{flex:1;min-width:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 2px;cursor:pointer;color:var(--muted);font-family:var(--sans);transition:.12s;}.tab span{font-size:10px;font-weight:500;}.tab.active{color:var(--accent);}.tab:active{transform:scale(.93);}
 .toast{position:fixed;bottom:92px;left:50%;transform:translateX(-50%);background:rgba(29,29,31,.92);backdrop-filter:blur(12px);color:#fff;font-size:14px;font-weight:500;padding:11px 20px;border-radius:14px;z-index:40;animation:rise .25s;box-shadow:var(--shadow-float);}
 .citytabs{display:flex;gap:0;background:var(--fill);border-radius:12px;padding:3px;margin-bottom:10px;}
 .citytabs.scrollx{overflow-x:auto;}

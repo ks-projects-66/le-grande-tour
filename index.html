@@ -1931,6 +1931,56 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .storybtn:disabled{opacity:.6;}
 /* header share + auth actions */
 .syncactions{display:flex;align-items:center;gap:14px;}
+/* Desktop scale-up for the personal Le Grand Tour app */
+@media (min-width:900px){
+body{background:linear-gradient(180deg,#F7F8FB 0%,#ECEFF5 100%);}
+.app{max-width:1180px;min-height:100vh;background:var(--bg);box-shadow:0 0 0 1px rgba(0,0,0,.04),0 18px 60px rgba(16,24,40,.08);}
+.topbar{padding:22px 32px 16px;}
+.topbar-row,.syncrow,.progress{max-width:1120px;margin-left:auto;margin-right:auto;}
+.brandline{font-size:34px;}
+.kicker{font-size:12px;}
+.daychip-num{font-size:20px;}
+.scroll{padding-bottom:112px;}
+.page{max-width:1120px;margin:0 auto;padding:28px 32px 32px;}
+.page-h{font-size:40px;margin:4px 2px 22px;}
+.hero{padding:28px;margin-bottom:16px;}
+.hero-img{height:290px;width:calc(100% + 56px);margin:-28px -28px 22px;}
+.hero-city{font-size:42px;max-width:780px;}
+.hero-date,.hero-country,.hero-cond{font-size:15px;}
+.hero-weather{min-width:126px;}
+.hero-temp{font-size:26px;}
+.card,.daycard,.placecard,.privsec,.capture,.storycard{box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 34px rgba(16,24,40,.06);}
+.card{padding:18px;}
+.ministats,.journal-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.journal-stats{margin-bottom:10px;}
+.photogrid{grid-template-columns:repeat(6,1fr);}
+.photogrid.gallery{grid-template-columns:repeat(3,1fr);}
+.recapgrid{grid-template-columns:repeat(4,1fr);}
+.tripmap{height:390px;}
+.sheetcard{max-width:640px;border-radius:0;padding:22px 22px calc(22px + env(safe-area-inset-bottom));}
+.tabbar{width:auto;max-width:760px;min-width:620px;bottom:24px;border:1px solid var(--line);box-shadow:0 16px 46px rgba(16,24,40,.16);padding:10px 12px;border-radius:0;background:rgba(255,255,255,.92);}
+.tab{min-width:104px;flex-direction:row;justify-content:center;gap:7px;padding:9px 14px;}
+.tab span{font-size:13px;font-weight:700;}
+.toast{bottom:106px;}
+.authcard{max-width:420px;padding:34px 30px;}
+.authbrand{font-size:34px;}
+}
+@media (min-width:1000px){
+@supports selector(:has(*)){
+.page:has(> .hero){display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:16px;align-items:start;}
+.page:has(> .hero)>.hero,.page:has(> .hero)>.nudge,.page:has(> .hero)>.ministats{grid-column:1/-1;}
+.page:has(> .hero)>.section-label{grid-column:2;margin-top:0;}
+.page:has(> .hero)>.card{grid-column:2;}
+.page:has(> .hero)>.privsec,.page:has(> .hero)>.homeclock,.page:has(> .hero)>.mapday{grid-column:1;}
+.page:has(> .daycard){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.page:has(> .daycard)>.page-h{grid-column:1/-1;}
+.page:has(> .daycard)>.daycard{margin-bottom:0;}
+.page:has(> .recaphero){display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,.55fr);gap:16px;align-items:start;}
+.page:has(> .recaphero)>.recaphero,.page:has(> .recaphero)>.storycard,.page:has(> .recaphero)>.storybtn,.page:has(> .recaphero)>.tripmap,.page:has(> .recaphero)>.recap-cap{grid-column:1;}
+.page:has(> .recaphero)>.section-label,.page:has(> .recaphero)>.card,.page:has(> .recaphero)>.ministats{grid-column:2;}
+.page:has(> .recaphero)>.photogrid{grid-column:1/-1;}
+}
+}
 /* gentle page transition on tab switch */
 @media (prefers-reduced-motion:no-preference){
 .page{animation:pagein .26s cubic-bezier(.2,.8,.2,1) both;}
