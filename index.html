@@ -185,6 +185,14 @@ const plannedDay = ("plannedDay" in st) ? st.plannedDay : (p.defaultDay != null 
 return { ...p, seed: SEED_IDS.has(p.id), plannedDay, been: !!st.been, rated: !!st.rated };
 });
 }
+function heroPhoto(state, dayIndex, city) {
+  const j = (state.journal || []);
+  // Prefer a photo logged on this exact day, else any photo from this city.
+  const sameDay = j.find(e => e.day === dayIndex && e.photos && e.photos.length);
+  if (sameDay) return sameDay.photos[0].src;
+  const sameCity = j.find(e => e.city === city && e.photos && e.photos.length);
+  return sameCity ? sameCity.photos[0].src : null;
+}
 function questionFor(p) {
 if (p.cat === "See & Do") return `${p.name}. Glad you went?`;
 if (p.cat === "Shop") return `Find anything at ${p.name}?`;
@@ -1011,7 +1019,7 @@ const donePlaces = mergedPlaces(state).filter(p => p.been).length;
 const toggle = (id) => setLocal(s => ({ ...s, planDone: { ...s.planDone, [tIndex]: { ...(s.planDone[tIndex] || {}), [id]: !(s.planDone[tIndex] || {})[id] } } }));
 const removePlan = (id) => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [tIndex]: (s.planAdd[tIndex] || []).filter(x => x.id !== id) } }));
 const mapUrl = mapDayUrl(exploreToday);
-const heroImg = CITY_HERO[d.city];
+const heroImg = heroPhoto(state, tIndex, d.city) || CITY_HERO[d.city];
 
 return (
 <div className="page">
