@@ -1914,6 +1914,7 @@ return (
 --accent:#1F4DE6; --accent-d:#163BBD; --powder:#EAF0FF; --powder2:#C9D8FF;
 --paper:#F2F2F7; --paper2:#EDEDF2; --card:#FFFFFF; --line:#EDEDF2; --line2:#C7C7CC;
 --c-meal:#C2410C; --c-meal-bg:#FBEAE0;
+--warn:#B25000; --warn-bg:#FFF1E2;
 --c-wine:#9A1B3D; --c-wine-bg:#F7E3EA;
 --c-sight:#0E7C7B; --c-sight-bg:#DCF0EF;
 --c-moment:#6D28D9; --c-moment-bg:#ECE4FB;
@@ -1933,6 +1934,7 @@ color-scheme:light;
 --accent:#5B7DFF; --accent-d:#7A95FF; --powder:#1C2440; --powder2:#26315C;
 --paper:#0B0B0D; --paper2:#16161A; --card:#16161A; --line:#26262E; --line2:#33333C;
 --c-meal:#F2935C; --c-meal-bg:#3A241A;
+--warn:#F2935C; --warn-bg:#3A2A18;
 --c-wine:#E891A8; --c-wine-bg:#3A1F28;
 --c-sight:#5FBDBB; --c-sight-bg:#13302F;
 --c-moment:#B79AF0; --c-moment-bg:#241C3A;
@@ -1942,7 +1944,7 @@ color-scheme:dark;
 }
 :root[data-theme="dark"] .topbar{background:rgba(11,11,13,.82);}
 :root[data-theme="dark"] .tabbar{background:rgba(22,22,26,.82);box-shadow:0 -1px 0 rgba(255,255,255,.05);}
-:root[data-theme="dark"] .toast{background:rgba(240,240,245,.14);}
+:root[data-theme="dark"] .toast{color:#F2F2F5;background:rgba(40,40,48,.92);}
 :root[data-theme="dark"] body{background:#0B0B0D;}
 @media (min-width:1000px){
 :root[data-theme="dark"] body{background:linear-gradient(180deg,#08080A 0%,#101014 100%);}
@@ -1963,7 +1965,7 @@ color-scheme:dark;
 .progress-fill{height:100%;background:var(--accent);border-radius:0;transition:width .6s cubic-bezier(.2,.8,.2,1);}
 .syncrow{display:flex;align-items:center;justify-content:space-between;margin-top:8px;}
 .syncnote{font-size:11px;color:var(--muted);}
-.syncnote.warn{color:#B25000;font-weight:600;}
+.syncnote.warn{color:var(--warn);font-weight:600;}
 .signout{display:inline-flex;align-items:center;gap:5px;background:none;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--sans);padding:2px 0;}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .scroll{flex:1;overflow-y:auto;position:relative;z-index:2;padding-bottom:90px;}
@@ -2125,12 +2127,12 @@ color-scheme:dark;
 .authbrand{font-family:var(--serif);font-size:28px;font-weight:800;letter-spacing:-.03em;}
 .authsub{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.03em;margin:4px 0 22px;}
 .authinput{width:100%;background:var(--fill);border-radius:0;padding:13px;font-size:15px;font-family:var(--sans);color:var(--ink);margin-bottom:10px;}
-.autherr{font-size:13px;color:#B25000;margin-bottom:10px;font-weight:600;}
+.autherr{font-size:13px;color:var(--warn);margin-bottom:10px;font-weight:600;}
 .viewerbtn{background:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:14px;padding:6px;}
 .authnote{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.4;}
 input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit-appearance:none;}
 /* stale data banner */
-.stalebanner{display:block;width:100%;text-align:left;background:#FFF1E2;color:#B25000;border-radius:0;padding:10px 12px;font-size:12.5px;font-weight:600;line-height:1.35;margin-top:8px;cursor:pointer;font-family:var(--sans);}
+.stalebanner{display:block;width:100%;text-align:left;background:var(--warn-bg);color:var(--warn);border-radius:0;padding:10px 12px;font-size:12.5px;font-weight:600;line-height:1.35;margin-top:8px;cursor:pointer;font-family:var(--sans);}
 /* plan rows with inline delete */
 .planrow{display:flex;align-items:center;}
 .planrow .checkrow{flex:1;}
@@ -2168,7 +2170,7 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .photogrid.gallery button{aspect-ratio:4/3;}
 /* Run 3: explore edit affordance + destructive action */
 .editlink{display:inline-flex;align-items:center;gap:6px;border-radius:0;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);background:var(--fill);color:var(--ink2);margin-left:7px;}
-.dangerbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:transparent;color:#B25000;border-radius:0;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:8px;}
+.dangerbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:transparent;color:var(--warn);border-radius:0;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:8px;}
 /* Runs 4-5: capture inbox + agent sort */
 .capture{background:var(--surface);border-radius:0;padding:14px;margin-bottom:12px;box-shadow:var(--shadow);}
 .capture-row{display:flex;gap:9px;}
