@@ -687,14 +687,16 @@ return (
 <div className="authcard">
 <div className="authbrand">Le Grand Tour</div>
 <div className="authsub">Europe · June 2026</div>
+<p className="authlede">You've been invited to follow our trip — the route, the meals, the wines and the photos, day by day.</p>
+<button className="primary authview" onClick={onView}>View the trip</button>
+<div className="authdivider"><span>Travelling with us?</span></div>
 <form onSubmit={submit}>
 <input className="authinput" type="email" autoComplete="username" placeholder="Trip email" value={email} onChange={e => setEmail(e.target.value)} />
 <input className="authinput" type="password" autoComplete="current-password" placeholder="Password" value={pw} onChange={e => setPw(e.target.value)} />
 {err && <div className="autherr">{err}</div>}
-<button className="primary" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+<button className="authsignin" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in to add updates"}</button>
 </form>
-<button className="viewerbtn" onClick={onView}>Just looking? View the trip</button>
-<div className="authnote">Sign in with the shared trip login to add updates. Both travellers share one login and everything syncs.</div>
+<div className="authnote">Both travellers share one login and everything syncs.</div>
 </div>
 </div>
 );
@@ -2129,6 +2131,13 @@ color-scheme:dark;
 .authinput{width:100%;background:var(--fill);border-radius:0;padding:13px;font-size:15px;font-family:var(--sans);color:var(--ink);margin-bottom:10px;}
 .autherr{font-size:13px;color:var(--warn);margin-bottom:10px;font-weight:600;}
 .viewerbtn{background:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:14px;padding:6px;}
+.authlede{font-size:14.5px;color:var(--ink2);line-height:1.5;margin:8px 2px 20px;}
+.authcard .authview{margin-bottom:4px;}
+.authdivider{display:flex;align-items:center;gap:12px;margin:20px 2px 16px;color:var(--muted);font-size:12px;font-weight:600;}
+.authdivider::before,.authdivider::after{content:"";flex:1;height:1px;background:var(--line2);}
+.authsignin{width:100%;background:var(--fill);color:var(--ink);border-radius:0;padding:13px;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:.12s;}
+.authsignin:active{background:var(--fill2);transform:scale(.99);}
+.authsignin:disabled{opacity:.6;}
 .authnote{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.4;}
 input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit-appearance:none;}
 /* stale data banner */
