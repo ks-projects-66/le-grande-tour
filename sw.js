@@ -4,8 +4,6 @@
  *  - Navigations to the root app: NETWORK-FIRST, falling back to the cached shell.
  *    This guarantees an online visitor always gets the freshest HTML (no stale-app
  *    trap while the trip is live), but the app still opens offline.
- *  - Navigations to the sibling apps (/app/, /voyage/) are left entirely on the
- *    network — this worker does not manage them.
  *  - Other GET requests (CDN libraries, map tiles, journal photos, fonts, hero
  *    images): STALE-WHILE-REVALIDATE, so anything viewed once is available offline
  *    and updates quietly in the background.
@@ -38,8 +36,6 @@ self.addEventListener("fetch", (e) => {
 
   // Page loads: network-first with a cached-shell fallback.
   if (req.mode === "navigate") {
-    // Leave the other apps in this repo on the network entirely.
-    if (url.origin === self.location.origin && /\/(app|voyage)\//.test(url.pathname)) return;
     e.respondWith((async () => {
       try {
         const fresh = await fetch(req);

@@ -6,8 +6,7 @@
 //              read via Gemini's url_context tool; falls back to a schema-only call.
 //   • story  — write a short, grounded trip recap from the supplied journal entries.
 //   • doc    — read a PDF/photo of a ticket, booking or itinerary (sent as inline_data)
-//              and extract its logistics into structured items. Deliberately city-
-//              agnostic so the white-label /app can use it for any trip.
+//              and extract its logistics into structured items.
 //
 // Notes: gemini-2.5-flash is a thinking model, so thinking is disabled (thinkingBudget 0)
 // to keep latency/cost down and leave the output budget for the actual response.

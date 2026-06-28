@@ -1,6 +1,6 @@
-City photos used by Le Grand Tour (root hero images) and Voyage (/voyage destinations).
+City photos used by Le Grand Tour as hero images.
 All sourced from Wikimedia Commons and self-hosted here. Attribution shown in-app
-(root: Tour tab footer; Voyage: under the destinations grid).
+(Tour tab footer).
 
 paris.jpg
   Title:   Eiffel Tower and Pont Alexandre III at night
