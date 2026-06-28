@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Voyage">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%231F4DE6%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%231F4DE6%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%2341599C%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%2341599C%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Voyage%22%2C%22short_name%22%3A%22Voyage%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23F2F2F7%22%2C%22theme_color%22%3A%22%23F2F2F7%22%2C%22start_url%22%3A%22./%22%2C%22scope%22%3A%22./%22%7D">
 <style>html,body,#root{height:100%;margin:0}body{background:#F2F2F7;-webkit-text-size-adjust:100%}</style>
 <script type="importmap">
@@ -38,7 +38,7 @@ import {
 Sun, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
 Camera, Sparkles, Check, Plus, Copy, Trash2, Star, ChevronDown, ChevronLeft, BookOpen,
 CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote,
-X, Map as MapIcon, MapPin, Users, Home, Search, Luggage
+X, Map as MapIcon, MapPin, Users, Home, Search, Luggage, Share2, UserPlus, Zap, RefreshCw, ShieldCheck, Link as LinkIcon, Download
 } from "lucide-react";
 
 /* ============================== SUPABASE ============================== */
@@ -53,7 +53,7 @@ const TAGLINE = "PLAN ANY TRIP, ANYWHERE"; // (inside a trip, the trip's own nam
 
 /* ============================== EXPLORE TAXONOMY ============================== */
 
-const VIBES = ["Fancy dinner","Long lunch","Quick bite","Coffee & cake","Wine bar","Cheap & cheerful","Sweet treat","Must-see","Hidden gem","Golden hour","Museum","Gallery","Historic site","Sightseeing","Winery","Browse & buy"];
+const VIBES = ["Fancy dinner","Long lunch","Quick bite","Coffee & cake","Wine bar","Cheap & cheerful","Sweet treat","Must-see","Hidden gem","Golden hour","Browse & buy"];
 const CATS = ["Eat & Drink","See & Do","Shop"];
 
 const PRIVATE_TYPE_META = {
@@ -77,7 +77,35 @@ Moment:{ icon: Sparkles,       color: "var(--c-moment)", bg: "var(--c-moment-bg)
 /* ============================== HELPERS ============================== */
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+const shareToken = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 const todayCanon = () => new Date().toLocaleDateString("en-CA");
+function appUrl(params = {}) {
+const u = new URL(window.location.href);
+Object.entries(params).forEach(([k, v]) => v == null ? u.searchParams.delete(k) : u.searchParams.set(k, v));
+return u.toString();
+}
+function publicRecapUrl(token) { return appUrl({ recap: token }); }
+function sumRatings(r) { return Object.values(r || {}).reduce((a, b) => a + (b || 0), 0); }
+function buildRecapSnapshot(trip, days, state) {
+const journal = state.journal || [];
+const meals = journal.filter(j => j.type === "Meal");
+const wines = journal.filter(j => j.type === "Wine");
+const bestMeal = [...meals].sort((a, b) => sumRatings(b.ratings) - sumRatings(a.ratings))[0] || null;
+const bestWine = [...wines].sort((a, b) => sumRatings(b.ratings) - sumRatings(a.ratings))[0] || null;
+const allPhotos = journal.flatMap(j => (j.photos || []).map(p => ({ src: p.src, name: p.name || j.title }))).slice(0, 18);
+const cities = [...new Set((days || []).map(d => d.city).filter(Boolean))];
+return {
+trip: { name: trip.name, start_date: trip.start_date, end_date: trip.end_date, travellers: trip.travellers || [] },
+days: (days || []).map(d => ({ date: d.date, city: d.city, disp: d.disp, country: d.country })),
+cities,
+stats: { days: (days || []).length, cities: cities.length, meals: meals.length, wines: wines.length, memories: journal.length },
+bestMeal: bestMeal ? { title: bestMeal.title, city: bestMeal.city, ratings: bestMeal.ratings || {}, note: bestMeal.note || "" } : null,
+bestWine: bestWine ? { title: bestWine.title, city: bestWine.city, ratings: bestWine.ratings || {}, note: bestWine.note || "" } : null,
+photos: allPhotos,
+journal: journal.slice(0, 80).map(j => ({ type: j.type, title: j.title, note: j.note || "", city: j.city || "", day: j.day, ratings: j.ratings || {}, photos: (j.photos || []).slice(0, 4).map(p => ({ src: p.src, name: p.name || "" })) })),
+updated_at: new Date().toISOString(),
+};
+}
 
 function fmtDate(iso) {
 const m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -236,35 +264,6 @@ return blob || file;
 } catch (e) { return file; }
 }
 
-// Read a File/Blob to a base64 string (no data: prefix).
-function fileToBase64(file) {
-return new Promise((resolve, reject) => {
-const r = new FileReader();
-r.onload = () => resolve(String(r.result).split(",")[1] || "");
-r.onerror = reject;
-r.readAsDataURL(file);
-});
-}
-
-// Send a PDF or photo of a ticket/itinerary to the assistant (doc mode) and get
-// back structured logistics items. Images are compressed first; the Gemini key
-// stays server side and the call requires a signed-in user.
-async function aiExtractDoc(file, accessToken) {
-let f = file;
-if (file.type && file.type.startsWith("image/")) { try { f = await compressImage(file); } catch (e) {} }
-const data = await fileToBase64(f);
-const mimeType = (f.type || file.type || "application/pdf");
-const r = await fetch(`${SUPABASE_URL}/functions/v1/assistant`, {
-method: "POST",
-headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
-body: JSON.stringify({ mode: "doc", mimeType, data }),
-});
-if (!r.ok) throw new Error("doc request failed");
-const j = await r.json();
-if (j.error) throw new Error(j.error);
-return Array.isArray(j.items) ? j.items : [];
-}
-
 /* ============================== ITINERARY DERIVATION ============================== */
 
 // Build a per-day itinerary from a trip's date range + its destination legs.
@@ -316,118 +315,6 @@ if (pts.length === 1) return `https://www.google.com/maps/search/?api=1&query=${
 return `https://www.google.com/maps/dir/?api=1&destination=${pts[pts.length - 1]}&waypoints=${pts.slice(0, -1).join("%7C")}&travelmode=walking`;
 }
 
-// Open a single place in Google Maps, searching by name + area + city.
-function mapPlaceUrl(p) {
-const q = [p.name, (p.area || "").replace(/·/g, ","), p.city].filter(Boolean).join(", ");
-return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : null;
-}
-// Open a free-text query (e.g. a hotel/venue title + city) in Google Maps.
-function mapQueryUrl(q) {
-const s = (q || "").trim();
-return s ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s)}` : null;
-}
-
-/* ============================== CURRENCY (FX) ============================== */
-
-// Country (display name, as returned by geocoding) -> ISO currency. Keeps FX
-// white-label: any geocoded country resolves the same way; unknown countries
-// simply hide the FX chip rather than guess a rate.
-const CCY = {
-"Australia":{code:"AUD",sym:"$"},"United Kingdom":{code:"GBP",sym:"£"},"United States":{code:"USD",sym:"$"},
-"France":{code:"EUR",sym:"€"},"Germany":{code:"EUR",sym:"€"},"Italy":{code:"EUR",sym:"€"},"Spain":{code:"EUR",sym:"€"},
-"Netherlands":{code:"EUR",sym:"€"},"Belgium":{code:"EUR",sym:"€"},"Ireland":{code:"EUR",sym:"€"},"Portugal":{code:"EUR",sym:"€"},
-"Austria":{code:"EUR",sym:"€"},"Greece":{code:"EUR",sym:"€"},"Finland":{code:"EUR",sym:"€"},"Croatia":{code:"EUR",sym:"€"},
-"Denmark":{code:"DKK",sym:"kr"},"Sweden":{code:"SEK",sym:"kr"},"Norway":{code:"NOK",sym:"kr"},"Switzerland":{code:"CHF",sym:"CHF"},
-"Czechia":{code:"CZK",sym:"Kč"},"Czech Republic":{code:"CZK",sym:"Kč"},"Poland":{code:"PLN",sym:"zł"},"Hungary":{code:"HUF",sym:"Ft"},
-"Japan":{code:"JPY",sym:"¥"},"China":{code:"CNY",sym:"¥"},"Thailand":{code:"THB",sym:"฿"},"Singapore":{code:"SGD",sym:"$"},
-"Malaysia":{code:"MYR",sym:"RM"},"Indonesia":{code:"IDR",sym:"Rp"},"India":{code:"INR",sym:"₹"},"Vietnam":{code:"VND",sym:"₫"},
-"New Zealand":{code:"NZD",sym:"$"},"Canada":{code:"CAD",sym:"$"},"Mexico":{code:"MXN",sym:"$"},"Brazil":{code:"BRL",sym:"R$"},
-"United Arab Emirates":{code:"AED",sym:"AED"},"Turkey":{code:"TRY",sym:"₺"},"South Korea":{code:"KRW",sym:"₩"},"Hong Kong":{code:"HKD",sym:"$"},
-"South Africa":{code:"ZAR",sym:"R"},"Iceland":{code:"ISK",sym:"kr"},
-};
-function ccyOf(country){ return (country && CCY[country]) || null; }
-function symOf(code){ const x = Object.values(CCY).find(c => c.code === code); return x ? x.sym : ""; }
-function fmtRate(v){ if(v==null) return "—"; if(v>=100) return Math.round(v).toLocaleString("en-AU"); if(v>=10) return v.toFixed(1); return v.toFixed(2); }
-function fmtMoney(v){ if(!isFinite(v)) v=0; return (Math.round(v*100)/100).toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2}); }
-
-// Live FX rates from open.er-api.com (keyless, CORS). Cached in localStorage and
-// shown instantly; refreshed in the background when older than a day. Returns
-// null until any rates (cached or live) exist, so callers degrade gracefully.
-function useRates(homeCode){
-const [data, setData] = useState(() => { try { return JSON.parse(localStorage.getItem("fx:"+homeCode) || "null"); } catch(e){ return null; } });
-useEffect(() => {
-if (!homeCode) return;
-let on = true, cached = null;
-try { cached = JSON.parse(localStorage.getItem("fx:"+homeCode) || "null"); } catch(e){}
-if (cached && cached.base === homeCode) setData(cached);
-if (cached && cached.base === homeCode && (Date.now() - (cached.fetchedAt||0) < 24*3600*1000)) return;
-fetch("https://open.er-api.com/v6/latest/"+homeCode)
-.then(r => r.ok ? r.json() : null)
-.then(j => { if (on && j && j.rates) { const obj = { base: homeCode, rates: j.rates, date: j.time_last_update_utc || "", fetchedAt: Date.now() }; setData(obj); try { localStorage.setItem("fx:"+homeCode, JSON.stringify(obj)); } catch(e){} } })
-.catch(() => {});
-return () => { on = false; };
-}, [homeCode]);
-if (!data || data.base !== homeCode) return null;
-return { ...data, stale: (Date.now() - (data.fetchedAt||0) > 36*3600*1000) };
-}
-
-// Small FX chip for the current region (home -> local). Tap opens a converter
-// sheet. Hidden when there is no home currency, no local currency, or they match.
-function FxChip({ homeCode, homeSym, country, tripCountries }){
-const local = ccyOf(country);
-const rates = useRates(homeCode);
-const [open, setOpen] = useState(false);
-if (!homeCode || !local || local.code === homeCode) return null;
-const rate = rates && rates.rates ? rates.rates[local.code] : null;
-return (
-<>
-<button className="fxchip" onClick={() => setOpen(true)} aria-label="Currency converter">
-<span className="fxchip-rate">{homeSym}1 <span className="fxchip-arr">→</span> {local.sym}{fmtRate(rate)}</span>
-<span className="fxchip-code">{homeCode} → {local.code}</span>
-</button>
-{open && <FxSheet homeCode={homeCode} homeSym={homeSym} local={local} rates={rates} tripCountries={tripCountries} onClose={() => setOpen(false)} />}
-</>
-);
-}
-
-function FxSheet({ homeCode, homeSym, local, rates, tripCountries, onClose }){
-const [amt, setAmt] = useState("100");
-const [flip, setFlip] = useState(false); // false: home -> local, true: local -> home
-const rate = rates && rates.rates ? rates.rates[local.code] : null;
-const n = parseFloat(amt) || 0;
-const out = rate ? (flip ? n / rate : n * rate) : 0;
-const fromSym = flip ? local.sym : homeSym, toSym = flip ? homeSym : local.sym;
-const fromCode = flip ? local.code : homeCode, toCode = flip ? homeCode : local.code;
-const others = Array.from(new Set((tripCountries||[]).map(c => { const x = ccyOf(c); return x ? x.code : null; }).filter(Boolean)))
-.filter(code => code !== homeCode && code !== local.code)
-.map(code => ({ code, sym: symOf(code) }));
-return createPortal(
-<div className="sheet" onClick={onClose}>
-<div className="sheetcard" onClick={e => e.stopPropagation()}>
-<div className="sheethead">
-<div className="sheettitle">Currency</div>
-<button className="sheetx" onClick={onClose} aria-label="Close"><X size={16} /></button>
-</div>
-<div className="fxbig">{homeSym}1 = {local.sym}{fmtRate(rate)} <span className="fxbig-code">{local.code}</span></div>
-<div className="fxconv">
-<label className="fxconv-cell"><span className="fxconv-code">{fromCode}</span><input className="fxconv-input" type="number" inputMode="decimal" value={amt} onChange={e => setAmt(e.target.value)} /></label>
-<button className="fxswap" onClick={() => setFlip(f => !f)} aria-label="Swap direction">⇄</button>
-<div className="fxconv-cell out"><span className="fxconv-code">{toCode}</span><div className="fxconv-out">{toSym}{fmtMoney(out)}</div></div>
-</div>
-<div className="muted xs fxnote">Indicative mid-market rate{rates && rates.date ? ` · ${rates.date}` : ""}{rates && rates.stale ? " · may be out of date offline" : ""}</div>
-{others.length > 0 && (
-<>
-<div className="section-label">Other regions on this trip</div>
-<div className="fxlist">
-{others.map(o => <div className="fxlistrow" key={o.code}><span className="fxlistrow-code">{o.code}</span><span className="fxlistrow-val">{homeSym}1 ≈ {o.sym}{fmtRate(rates && rates.rates ? rates.rates[o.code] : null)}</span></div>)}
-</div>
-</>
-)}
-</div>
-</div>
-, document.body);
-}
-
 /* ============================== EXPLORE STATE HELPERS ============================== */
 
 function mergedPlaces(state) {
@@ -473,6 +360,53 @@ return (data || []).map(r => ({ id: r.id, city: r.city, country: r.country, lat:
 async loadAllLegs() {
 const { data } = await supabase.from("wl_legs").select("trip_id,city,arrival_date");
 return data || [];
+},
+async claimMemberships(user) {
+if (!user || !user.email) return;
+try {
+await supabase.from("wl_trip_members")
+.update({ user_id: user.id, accepted_at: new Date().toISOString() })
+.is("user_id", null)
+.ilike("invited_email", user.email);
+} catch (e) {}
+},
+async loadMembers(tripId) {
+const { data, error } = await supabase.from("wl_trip_members")
+.select("id,trip_id,user_id,invited_email,display_name,role,accepted_at,created_at")
+.eq("trip_id", tripId)
+.order("created_at", { ascending: true });
+if (error) return { enabled: false, members: [], error };
+return { enabled: true, members: data || [] };
+},
+async inviteMember(tripId, email, role = "editor") {
+const row = { id: uid(), trip_id: tripId, invited_email: email.trim().toLowerCase(), display_name: email.trim(), role };
+const { data, error } = await supabase.from("wl_trip_members").upsert(row, { onConflict: "trip_id,invited_email" }).select().single();
+if (error) throw error;
+return data;
+},
+async removeMember(id) {
+const { error } = await supabase.from("wl_trip_members").delete().eq("id", id);
+if (error) throw error;
+},
+async loadPublicRecap(token) {
+const { data, error } = await supabase.from("wl_recap_shares")
+.select("token,snapshot,updated_at")
+.eq("token", token)
+.single();
+if (error) throw error;
+return data;
+},
+async saveRecapShare(tripId, snapshot) {
+let token = shareToken();
+try {
+const { data: existing } = await supabase.from("wl_recap_shares").select("token").eq("trip_id", tripId).maybeSingle();
+if (existing && existing.token) token = existing.token;
+} catch (e) {}
+const { data, error } = await supabase.from("wl_recap_shares").upsert({
+trip_id: tripId, token, snapshot, updated_at: new Date().toISOString(),
+}, { onConflict: "trip_id" }).select("token").single();
+if (error) throw error;
+return data.token;
 },
 async createTrip(trip, legs) {
 const { data, error } = await supabase.from("wl_trips").insert({
@@ -621,6 +555,9 @@ return (
 /* ============================== ROOT ============================== */
 
 function App() {
+const publicToken = useMemo(() => new URLSearchParams(window.location.search).get("recap"), []);
+const [publicRecap, setPublicRecap] = useState(null);
+const [publicErr, setPublicErr] = useState("");
 const [session, setSession] = useState(null);
 const [authChecked, setAuthChecked] = useState(false);
 const [view, setView] = useState("trips"); // trips | wizard | trip
@@ -636,8 +573,14 @@ const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
 return () => { sub.subscription.unsubscribe(); };
 }, []);
 
+useEffect(() => {
+if (!publicToken) return;
+db.loadPublicRecap(publicToken).then(r => setPublicRecap(r.snapshot)).catch(() => setPublicErr("This recap link is not available."));
+}, [publicToken]);
+
 const loadTrips = async () => {
 try {
+if (session && session.user) await db.claimMemberships(session.user);
 const [t, allLegs] = await Promise.all([db.loadTrips(), db.loadAllLegs()]);
 const counts = {};
 (allLegs || []).forEach(l => { counts[l.trip_id] = (counts[l.trip_id] || 0) + 1; });
@@ -669,6 +612,7 @@ else setView("trips");
 };
 const signOut = async () => { await supabase.auth.signOut(); };
 
+if (publicToken) return <div className="app"><Style />{publicRecap ? <PublicRecap snapshot={publicRecap} /> : <div className="page"><div className="muted sm empty pad">{publicErr || "Loading recap..."}</div></div>}</div>;
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session) return <div className="app"><Style /><AuthScreen /></div>;
 
@@ -910,6 +854,10 @@ const [loaded, setLoaded] = useState(false);
 const [stale, setStale] = useState(false);
 const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 const [toast, setToast] = useState("");
+const [sync, setSync] = useState({ state: "idle", message: "Synced" });
+const [members, setMembers] = useState({ enabled: null, list: [] });
+const [sharing, setSharing] = useState(false);
+const [capturing, setCapturing] = useState(false);
 const PREFS_KEY = `wl:prefs:${trip.id}`;
 const [state, setState] = useState({ weather: {}, planDone: {}, planAdd: {}, journal: [], exploreStatus: {}, exploreAdded: [], privateNotes: [] });
 const localPrefs = useRef({ weather: {}, planDone: {}, planAdd: {} });
@@ -931,11 +879,29 @@ return () => { window.removeEventListener("online", onUp); window.removeEventLis
 }, []);
 
 const localToast = (m) => { setToast(m); setTimeout(() => setToast(""), 1800); };
+const runSave = async (label, op) => {
+if (!online) { setSync({ state: "queued", message: "Offline, retry when connected" }); throw new Error("offline"); }
+setSync({ state: "saving", message: label || "Saving..." });
+try {
+const result = await op();
+setSync({ state: "synced", message: "Saved" });
+setTimeout(() => setSync(s => s.state === "synced" ? { state: "idle", message: "Synced" } : s), 1600);
+return result;
+} catch (e) {
+setSync({ state: "error", message: "Sync failed, tap retry" });
+throw e;
+}
+};
+const refreshMembers = async () => {
+const r = await db.loadMembers(trip.id);
+setMembers({ enabled: r.enabled, list: r.members || [] });
+return r;
+};
 const refresh = async () => {
 try {
-const data = await db.loadTripData(trip.id);
+const [data] = await Promise.all([db.loadTripData(trip.id), refreshMembers()]);
 setState(s => ({ ...s, ...localPrefs.current, ...data }));
-setStale(false); setLoaded(true);
+setStale(false); setLoaded(true); setSync({ state: "idle", message: "Synced" });
 } catch (e) { setStale(true); setLoaded(true); }
 };
 useEffect(() => { refresh(); }, [trip.id]);
@@ -950,7 +916,7 @@ try { navigator.clipboard.writeText(txt); localToast((label || "Copied") + " cop
 catch { localToast("Copy failed"); }
 };
 
-const ctx = { state, setState, setLocal, tIndex, days, legs, trip, tripCities, total, copy, flash: localToast, uid, setTab, refresh, db, session, user: session.user, canEdit: true };
+const ctx = { state, setState, setLocal, tIndex, days, legs, trip, tripCities, total, copy, flash: localToast, uid, setTab, refresh, refreshMembers, runSave, members, db, session, user: session.user, canEdit: true };
 
 const stats = useMemo(() => {
 const wines = state.journal.filter(j => j.type === "Wine").length;
@@ -968,6 +934,7 @@ return (
 <div className="brand-mid">
 <div className="brandline mid">{trip.name}</div>
 </div>
+<button className="sharetop" onClick={() => setSharing(true)}><Share2 size={14} /> Share</button>
 <div className="daychip">
 <span className="daychip-num">Day {Math.min(tIndex + 1, total)}</span>
 <span className="daychip-of">/ {total}</span>
@@ -975,7 +942,8 @@ return (
 </div>
 <div className="progress"><div className="progress-fill" style={{ width: `${((tIndex + 1) / total) * 100}%` }} /></div>
 <div className="syncrow">
-<span className={"syncnote" + (!online ? " warn" : "")}>{!online ? "offline — changes paused" : "Signed in · synced to your account"}</span>
+<span className={"syncnote" + (!online || sync.state === "error" || sync.state === "queued" ? " warn" : "")}>{!online ? "offline - edits stay local until reconnected" : `${sync.message}${members.enabled === false ? " - collaboration setup needed" : ""}`}</span>
+{sync.state === "error" && <button className="syncbtn" onClick={refresh}><RefreshCw size={11} /> Retry</button>}
 </div>
 {stale && <button className="stalebanner" onClick={refresh}>Couldn't load the latest trip data — tap to retry.</button>}
 </header>
@@ -986,9 +954,13 @@ return (
 {days.length > 0 && tab === "days" && <Days {...ctx} />}
 {tab === "journal" && <Journal {...ctx} stats={stats} />}
 {days.length > 0 && tab === "explore" && <Explore {...ctx} />}
+{days.length > 0 && tab === "recap" && <Recap {...ctx} />}
 </main>
 
 {toast && <div className="toast">{toast}</div>}
+{sharing && <ShareTrip ctx={ctx} onClose={() => setSharing(false)} />}
+{capturing && <FastCapture ctx={ctx} onClose={() => setCapturing(false)} />}
+<button className="capturefab" onClick={() => setCapturing(true)}><Zap size={17} /> Capture</button>
 
 <nav className="tabbar">
 {[
@@ -996,6 +968,7 @@ return (
 { id: "days", label: "Days", Icon: CalendarDays },
 { id: "journal", label: "Journal", Icon: BookOpen },
 { id: "explore", label: "Explore", Icon: Compass },
+{ id: "recap", label: "Recap", Icon: Sparkles },
 ].map(({ id, label, Icon }) => (
 <button key={id} className={"tab" + (tab === id ? " active" : "")} onClick={() => setTab(id)}>
 <Icon size={20} strokeWidth={tab === id ? 2.2 : 1.7} />
@@ -1012,68 +985,37 @@ return (
 function useSetStatus(ctx) {
 return (id, patch) => {
 ctx.setState(s => ({ ...s, exploreStatus: { ...s.exploreStatus, [id]: { ...(s.exploreStatus[id] || {}), ...patch } } }));
-ctx.db.upsertStatus(ctx.trip.id, id, patch).catch(() => ctx.flash("Sync failed — retry"));
+ctx.runSave("Saving place status...", () => ctx.db.upsertStatus(ctx.trip.id, id, patch)).catch(() => ctx.flash("Sync failed - retry"));
 };
 }
 
 /* ============================== PRIVATE NOTES ============================== */
 
 function PrivateNotes({ ctx, dayIndex, compact }) {
-const { state, copy, db, setState, flash, trip, session } = ctx;
+const { state, copy, db, setState, flash, trip, runSave } = ctx;
 const [adding, setAdding] = useState(false);
-const [reading, setReading] = useState(false);
 const notes = (state.privateNotes || []).filter(n => n.day === dayIndex);
 const groups = PRIVATE_TYPE_ORDER.map(t => ({ type: t, items: notes.filter(n => n.type === t) })).filter(g => g.items.length);
-const cityHint = ((ctx.days && ctx.days[dayIndex]) ? ctx.days[dayIndex].city : "") || "";
 
 const del = async (id) => {
 const prev = state.privateNotes;
 setState(s => ({ ...s, privateNotes: (s.privateNotes || []).filter(n => n.id !== id) }));
-try { await db.deletePrivateNote(id); flash("Note removed"); }
+try { await runSave("Removing note...", () => db.deletePrivateNote(id)); flash("Note removed"); }
 catch (e) { flash("Delete failed"); setState(s => ({ ...s, privateNotes: prev })); }
 };
 const addNote = async (note) => {
 const entry = { id: uid(), day: dayIndex, type: note.type, title: note.title, body: note.body, ref: note.ref, url: "", sort_order: 0 };
 setState(s => ({ ...s, privateNotes: [...(s.privateNotes || []), entry] }));
 setAdding(false);
-try { await db.addPrivateNote(trip.id, entry); flash("Note added"); }
+try { await runSave("Saving note...", () => db.addPrivateNote(trip.id, entry)); flash("Note added"); }
 catch (e) { flash("Could not save note"); }
 };
-
-// Upload a PDF or photo of a ticket/itinerary; the assistant extracts the
-// logistics and we add them straight to this day (each is editable/removable).
-const onDoc = async (e) => {
-const file = e.target.files && e.target.files[0];
-e.target.value = "";
-if (!file) return;
-if (file.size > 8 * 1024 * 1024) { flash("File too large (max 8MB)"); return; }
-setReading(true);
-try {
-const items = await aiExtractDoc(file, session && session.access_token);
-if (!items.length) { flash("No travel details found in that file"); }
-else {
-const added = items.map(it => ({ id: uid(), day: dayIndex, type: PRIVATE_TYPE_ORDER.includes(it.type) ? it.type : "note", title: it.title || "Booking", body: it.body || "", ref: it.ref || "", url: "", sort_order: 0 }));
-setState(s => ({ ...s, privateNotes: [...(s.privateNotes || []), ...added] }));
-for (const entry of added) { try { await db.addPrivateNote(trip.id, entry); } catch (err) {} }
-flash(`Added ${added.length} ${added.length === 1 ? "item" : "items"} from your document`);
-setAdding(false);
-}
-} catch (err) { flash("Couldn't read that document"); }
-setReading(false);
-};
-const uploadBtn = (
-<label className="privupload">
-<ImagePlus size={14} /> {reading ? "Reading your document…" : "Attach ticket or itinerary"}
-<input type="file" accept="application/pdf,image/*" disabled={reading} onChange={onDoc} />
-</label>
-);
 
 if (!notes.length && !adding) {
 return (
 <div className="privsec">
 <div className="privhead"><Bed size={13} /> Logistics</div>
 <button className="privadd" onClick={() => setAdding(true)}><Plus size={14} /> Add a booking or note</button>
-{uploadBtn}
 </div>
 );
 }
@@ -1091,8 +1033,6 @@ return (
 <div className="privrow-title">{n.title}</div>
 {n.body && <div className="muted xs">{n.body}</div>}
 {n.ref && <button className="reflink xs" onClick={() => copy(n.ref, "Reference")}><span>{n.ref}</span><Copy size={11} /></button>}
-{(n.type === "hotel" || n.type === "ticket") && mapQueryUrl([n.title, cityHint].filter(Boolean).join(", ")) &&
-<a className="privmap" href={mapQueryUrl([n.title, cityHint].filter(Boolean).join(", "))} target="_blank" rel="noopener noreferrer"><MapIcon size={11} /> Map</a>}
 </div>
 <button className="del" onClick={() => del(n.id)}><Trash2 size={13} /></button>
 </div>
@@ -1101,7 +1041,7 @@ return (
 );
 })}
 {adding ? <AddPrivateNote onCancel={() => setAdding(false)} onAdd={addNote} />
-: <><button className="privadd" onClick={() => setAdding(true)}><Plus size={14} /> Add a booking or note</button>{uploadBtn}</>}
+: <button className="privadd" onClick={() => setAdding(true)}><Plus size={14} /> Add a booking or note</button>}
 </div>
 );
 }
@@ -1162,8 +1102,6 @@ onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather, [tIndex]: e.targe
 </div>
 
 {showClock && <HomeClock homeTz={trip.home_tz} homeCity={trip.home_city} />}
-
-<FxChip homeCode={(ccyOf(trip.home_country)||{}).code||""} homeSym={(ccyOf(trip.home_country)||{}).sym||""} country={d.country} tripCountries={days.map(x => x.country)} />
 
 {toRate > 0 && (
 <button className="nudge" onClick={() => setTab("journal")}>
@@ -1273,7 +1211,7 @@ onClick={() => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [i]: (s.planAdd[i
 /* ============================== JOURNAL ============================== */
 
 function Journal(ctx) {
-const { state, setState, tIndex, stats, flash, db, trip, days, session } = ctx;
+const { state, setState, tIndex, stats, flash, db, trip, days, session, runSave } = ctx;
 const setStatus = useSetStatus(ctx);
 const travellers = trip.travellers && trip.travellers.length ? trip.travellers : ["Me"];
 const d = days[tIndex] || { city: "" };
@@ -1293,7 +1231,7 @@ if (!title.trim()) return;
 setBusy(true);
 const entry = { id: uid(), type, title: title.trim(), note: note.trim(), ratings: { ...ratings }, region: region.trim(), vintage: vintage.trim(), city: d.city, day: tIndex, ts: Date.now(), place_id: null, photos: [] };
 try {
-await db.addJournal(trip.id, entry);
+await runSave("Saving journal entry...", () => db.addJournal(trip.id, entry));
 const uploaded = [];
 for (const f of files) { try { uploaded.push(await db.uploadPhoto(trip.id, entry.id, f, session.user.id)); } catch (e) { flash("A photo failed to upload"); } }
 files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
@@ -1308,7 +1246,7 @@ const del = async (id) => {
 if (!window.confirm("Delete this entry? Its photos will be removed too.")) return;
 const prev = state.journal;
 setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== id) }));
-try { await db.deleteJournal(id); } catch (e) { flash("Delete failed"); setState(s => ({ ...s, journal: prev })); }
+try { await runSave("Deleting journal entry...", () => db.deleteJournal(id)); } catch (e) { flash("Delete failed"); setState(s => ({ ...s, journal: prev })); }
 };
 const rated = state.journal.filter(j => Object.values(j.ratings || {}).some(v => v > 0));
 const avg = (name) => {
@@ -1409,7 +1347,7 @@ return (
 /* ============================== EDIT ENTRY ============================== */
 
 function EditEntry({ entry, ctx, travellers, onClose }) {
-const { setState, flash, db, trip, session } = ctx;
+const { setState, flash, db, trip, session, runSave } = ctx;
 const [type, setType] = useState(entry.type);
 const [title, setTitle] = useState(entry.title);
 const [note, setNote] = useState(entry.note || "");
@@ -1425,14 +1363,14 @@ const removePhoto = async (ph) => {
 if (!window.confirm("Remove this photo?")) return;
 setPhotos(ps => ps.filter(p => p.id !== ph.id));
 setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, photos: (j.photos || []).filter(p => p.id !== ph.id) } : j) }));
-try { await db.deletePhoto(ph); flash("Photo removed"); } catch (e) { flash("Could not remove photo"); }
+try { await runSave("Removing photo...", () => db.deletePhoto(ph)); flash("Photo removed"); } catch (e) { flash("Could not remove photo"); }
 };
 const save = async () => {
 if (!title.trim()) return;
 setBusy(true);
 const patch = { id: entry.id, type, title: title.trim(), note: note.trim(), ratings: { ...ratings }, region: region.trim(), vintage: vintage.trim(), city: city.trim() };
 try {
-await db.updateJournal(patch);
+await runSave("Updating journal entry...", () => db.updateJournal(patch));
 const uploaded = [];
 for (const f of files) { try { uploaded.push(await db.uploadPhoto(trip.id, entry.id, f, session.user.id)); } catch (e) { flash("A photo failed to upload"); } }
 files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
@@ -1488,7 +1426,7 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style
 /* ============================== EXPLORE ============================== */
 
 function Explore(ctx) {
-const { state, setState, tIndex, db, flash, days, tripCities, trip } = ctx;
+const { state, setState, tIndex, db, flash, days, tripCities, trip, runSave } = ctx;
 const setStatus = useSetStatus(ctx);
 const here = days[tIndex] ? days[tIndex].city : "";
 const cityList = tripCities.length ? tripCities : (here ? [here] : []);
@@ -1508,7 +1446,7 @@ const byCat = CATS.map(cat => ({ cat, items: shown.filter(p => p.cat === cat) })
 const addPlace = async (place) => {
 setState(s => ({ ...s, exploreAdded: [...(s.exploreAdded || []), place] }));
 setAdding(false);
-try { await db.addPlace(trip.id, place); } catch (e) { flash("Could not save place"); }
+try { await runSave("Saving place...", () => db.addPlace(trip.id, place)); } catch (e) { flash("Could not save place"); }
 };
 
 if (!cityList.length) return <div className="page"><div className="page-h">Explore</div><div className="muted sm empty pad">Add destinations to your trip to start collecting places.</div></div>;
@@ -1541,7 +1479,6 @@ return (
 {planned && day
 ? <button className="planpill" onClick={() => setPicker(picker === p.id ? null : p.id)}><CalendarDays size={12} /> {day.dow} {fmtDate(day.date)}</button>
 : <button className="addday" onClick={() => setPicker(picker === p.id ? null : p.id)}><CalendarPlus size={13} /> Add to a day</button>}
-{mapPlaceUrl(p) && <a className="maplink" href={mapPlaceUrl(p)} target="_blank" rel="noopener noreferrer"><MapIcon size={12} /> Map</a>}
 </div>
 {picker === p.id && (
 <div className="daypicker">
@@ -1582,7 +1519,7 @@ return (
 }
 
 function RatePrompt({ place, ctx, setStatus, travellers }) {
-const { setState, tIndex, flash, db, trip, session } = ctx;
+const { setState, tIndex, flash, db, trip, session, runSave } = ctx;
 const [ratings, setRatings] = useState(() => Object.fromEntries(travellers.map(t => [t, 0])));
 const [note, setNote] = useState("");
 const [files, setFiles] = useState([]);
@@ -1592,7 +1529,7 @@ setBusy(true);
 const day = place.plannedDay != null ? place.plannedDay : tIndex;
 const entry = { id: uid(), type: typeForPlace(place), title: place.name, note: note.trim(), ratings: { ...ratings }, region: "", vintage: "", city: place.city, day, ts: Date.now(), place_id: place.id, photos: [] };
 try {
-await db.addJournal(trip.id, entry);
+await runSave("Saving memory...", () => db.addJournal(trip.id, entry));
 const uploaded = [];
 for (const f of files) { try { uploaded.push(await db.uploadPhoto(trip.id, entry.id, f, session.user.id)); } catch (e) { flash("A photo failed to upload"); } }
 files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
@@ -1611,6 +1548,181 @@ return (
 <PhotoPicker files={files} setFiles={setFiles} flash={flash} />
 <button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving…" : "Save to journal"}</button>
 </Card>
+);
+}
+
+/* ============================== SHARE, CAPTURE, RECAP ============================== */
+
+function OverlaySheet({ title, onClose, children }) {
+return createPortal(
+<div className="sheet" onClick={onClose}>
+<div className="sheetcard" onClick={e => e.stopPropagation()}>
+<div className="sheethead">
+<div className="sheettitle">{title}</div>
+<button className="sheetx" onClick={onClose} aria-label="Close"><X size={16} /></button>
+</div>
+{children}
+</div>
+</div>
+, document.body);
+}
+
+function ShareTrip({ ctx, onClose }) {
+const { members, refreshMembers, runSave, db, trip, flash, copy, days, state } = ctx;
+const [email, setEmail] = useState("");
+const [recapUrl, setRecapUrl] = useState("");
+const invite = async () => {
+const v = email.trim().toLowerCase();
+if (!v || !v.includes("@")) { flash("Add an email address"); return; }
+try {
+await runSave("Inviting traveller...", () => db.inviteMember(trip.id, v));
+await refreshMembers();
+setEmail("");
+flash("Invite ready");
+} catch (e) { flash("Invite could not be saved"); }
+};
+const publish = async () => {
+try {
+const snapshot = buildRecapSnapshot(trip, days, state);
+const token = await runSave("Publishing recap...", () => db.saveRecapShare(trip.id, snapshot));
+const url = publicRecapUrl(token);
+setRecapUrl(url); copy(url, "Recap link");
+} catch (e) { flash("Recap sharing needs the Supabase migration"); }
+};
+return (
+<OverlaySheet title="Share trip" onClose={onClose}>
+<div className="shareblock">
+<div className="sharehero"><ShieldCheck size={17} /><div><strong>Group-first sync</strong><span>Invite a traveller by email. Once they sign in with that address, this trip appears in their account.</span></div></div>
+{members.enabled === false && <div className="autherr">Collaboration tables are not installed yet. Apply the Supabase migration included with this update.</div>}
+<div className="section-label tight"><Users size={13} /> Travellers</div>
+<div className="memberlist">
+{(members.list || []).length === 0 && <div className="muted sm">No invited collaborators yet.</div>}
+{(members.list || []).map(m => (
+<div key={m.id} className="memberrow">
+<div><div className="memberemail">{m.display_name || m.invited_email}</div><div className="muted xs">{m.accepted_at ? "Accepted" : "Invited"} · {m.role || "editor"}</div></div>
+<button className="del" onClick={() => runSave("Removing traveller...", () => db.removeMember(m.id)).then(refreshMembers).catch(() => flash("Could not remove traveller"))}><Trash2 size={13} /></button>
+</div>
+))}
+</div>
+<div className="quickadd">
+<input value={email} placeholder="Traveller email..." onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === "Enter") invite(); }} />
+<button onClick={invite}><UserPlus size={16} /></button>
+</div>
+</div>
+<div className="shareblock">
+<div className="section-label tight"><Sparkles size={13} /> End-of-trip recap</div>
+<button className="primary" onClick={publish}><Share2 size={15} /> Publish recap link</button>
+{recapUrl && <button className="reflink" onClick={() => copy(recapUrl, "Recap link")}><span>{recapUrl}</span><Copy size={12} /></button>}
+</div>
+</OverlaySheet>
+);
+}
+
+function FastCapture({ ctx, onClose }) {
+const { trip, days, tIndex, state, setState, db, session, runSave, flash } = ctx;
+const travellers = trip.travellers && trip.travellers.length ? trip.travellers : ["Me"];
+const day = days[tIndex] || {};
+const [type, setType] = useState("Moment");
+const [title, setTitle] = useState("");
+const [note, setNote] = useState("");
+const [ratings, setRatings] = useState(() => Object.fromEntries(travellers.map(t => [t, 0])));
+const [files, setFiles] = useState([]);
+const [busy, setBusy] = useState(false);
+const save = async () => {
+if (!title.trim()) { flash("Name the memory"); return; }
+setBusy(true);
+const entry = { id: uid(), type, title: title.trim(), note: note.trim(), ratings: { ...ratings }, region: "", vintage: "", city: day.city || "", day: tIndex, ts: Date.now(), place_id: null, photos: [] };
+try {
+const uploaded = await runSave("Saving quick capture...", async () => {
+await db.addJournal(trip.id, entry);
+const pics = [];
+for (const f of files) pics.push(await db.uploadPhoto(trip.id, entry.id, f, session.user.id));
+return pics;
+});
+files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
+entry.photos = uploaded || [];
+setState(s => ({ ...s, journal: [entry, ...s.journal] }));
+flash("Captured");
+onClose();
+} catch (e) { flash("Could not save capture"); }
+setBusy(false);
+};
+return (
+<OverlaySheet title="Quick capture" onClose={onClose}>
+<div className="capturelead"><Zap size={16} /> Photo, name, stars, done.</div>
+<div className="typetabs">
+{Object.keys(TYPE_META).map(tp => {
+const Ic = TYPE_META[tp].icon;
+return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style={type === tp ? { color: TYPE_META[tp].color } : undefined} onClick={() => setType(tp)}><Ic size={15} /> {tp}</button>;
+})}
+</div>
+<input className="inline-input full" placeholder={type === "Moment" ? "What happened..." : "Name..."} value={title} onChange={e => setTitle(e.target.value)} autoFocus />
+<input className="inline-input full" placeholder="One line, optional..." value={note} onChange={e => setNote(e.target.value)} />
+<PhotoPicker files={files} setFiles={setFiles} flash={flash} />
+<div className="ratepair">{travellers.map(t => <RateRow key={t} label={t} value={ratings[t] || 0} onChange={(v) => setRatings(r => ({ ...r, [t]: v }))} />)}</div>
+<button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving..." : "Save capture"}</button>
+</OverlaySheet>
+);
+}
+
+function Recap({ trip, days, state, db, runSave, copy, flash }) {
+const [url, setUrl] = useState("");
+const snapshot = useMemo(() => buildRecapSnapshot(trip, days, state), [trip, days, state]);
+const publish = async () => {
+try {
+const token = await runSave("Publishing recap...", () => db.saveRecapShare(trip.id, snapshot));
+const next = publicRecapUrl(token);
+setUrl(next); copy(next, "Recap link");
+} catch (e) { flash("Recap sharing needs the Supabase migration"); }
+};
+return (
+<div className="page">
+<div className="page-h">Recap</div>
+<div className="recaphero">
+<div className="kicker">PLAN TO MEMORY</div>
+<h2>{trip.name}</h2>
+<div className="muted sm">{snapshot.cities.join(" · ") || "Your route will appear here"}</div>
+</div>
+<div className="ministats">
+<Stat label="Days" value={snapshot.stats.days} />
+<Stat label="Cities" value={snapshot.stats.cities} />
+<Stat label="Memories" value={snapshot.stats.memories} accent />
+</div>
+{(snapshot.bestMeal || snapshot.bestWine) && <div className="section-label">The best of it</div>}
+{snapshot.bestMeal && <Card><div className="bestline"><UtensilsCrossed size={16} /> Best meal</div><div className="jcard-title">{snapshot.bestMeal.title}</div><div className="muted xs">{snapshot.bestMeal.city}</div></Card>}
+{snapshot.bestWine && <Card><div className="bestline"><Wine size={16} /> Best wine</div><div className="jcard-title">{snapshot.bestWine.title}</div><div className="muted xs">{snapshot.bestWine.city}</div></Card>}
+{!!snapshot.photos.length && <><div className="section-label">Photo highlights</div><div className="recapphotos">{snapshot.photos.map((p, i) => <img key={i} src={p.src} alt="" />)}</div></>}
+<Card>
+<div className="sharehero"><LinkIcon size={17} /><div><strong>Zero-install keepsake</strong><span>Publish a web recap anyone can open, with no app install and no login.</span></div></div>
+<button className="primary" onClick={publish}><Share2 size={15} /> Publish recap</button>
+{url && <button className="reflink" onClick={() => copy(url, "Recap link")}><span>{url}</span><Copy size={12} /></button>}
+<button className="ghostbtn block" onClick={() => window.print()}><Download size={15} /> Print or save PDF</button>
+</Card>
+</div>
+);
+}
+
+function PublicRecap({ snapshot }) {
+const s = snapshot || {};
+const stats = s.stats || {};
+return (
+<div className="publicrecap">
+<header className="publichero">
+<div className="brandline">{(s.trip && s.trip.name) || "Voyage recap"}</div>
+<div className="muted sm">{(s.cities || []).join(" · ")}</div>
+</header>
+<div className="ministats">
+<Stat label="Days" value={stats.days || 0} />
+<Stat label="Cities" value={stats.cities || 0} />
+<Stat label="Memories" value={stats.memories || 0} accent />
+</div>
+{(s.bestMeal || s.bestWine) && <div className="section-label">The best of it</div>}
+{s.bestMeal && <Card><div className="bestline"><UtensilsCrossed size={16} /> Best meal</div><div className="jcard-title">{s.bestMeal.title}</div><div className="muted xs">{s.bestMeal.city}</div></Card>}
+{s.bestWine && <Card><div className="bestline"><Wine size={16} /> Best wine</div><div className="jcard-title">{s.bestWine.title}</div><div className="muted xs">{s.bestWine.city}</div></Card>}
+{!!(s.photos || []).length && <><div className="section-label">Photo highlights</div><div className="recapphotos">{s.photos.map((p, i) => <img key={i} src={p.src} alt="" />)}</div></>}
+<div className="section-label">Diary</div>
+{(s.journal || []).slice(0, 24).map((j, i) => <Card key={i}><div className="jcard-title">{j.title}</div><div className="muted xs">{[j.type, j.city].filter(Boolean).join(" · ")}</div>{j.note && <div className="jcard-note">{j.note}</div>}</Card>)}
+</div>
 );
 }
 
@@ -1699,7 +1811,7 @@ return (
 :root{
 --bg:#F2F2F7; --surface:#FFFFFF; --fill:#EDEDF2; --fill2:#E5E5EA;
 --ink:#1D1D1F; --ink2:#6E6E73; --muted:#8E8E93;
---accent:#1F4DE6; --accent-d:#163BBD; --powder:#EAF0FF; --powder2:#C9D8FF;
+--accent:#41599C; --accent-d:#314779; --powder:#EEF1F6; --powder2:#D7DEEE;
 --card:#FFFFFF; --line:#EDEDF2; --line2:#C7C7CC;
 --c-meal:#C2410C; --c-meal-bg:#FBEAE0;
 --c-wine:#9A1B3D; --c-wine-bg:#F7E3EA;
@@ -1722,6 +1834,7 @@ return (
 .brandline.mid{font-size:18px;text-align:center;}
 .brand-mid{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .crumb{display:inline-flex;align-items:center;gap:2px;background:none;color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);padding:4px 2px;flex:none;}
+.sharetop{display:inline-flex;align-items:center;gap:5px;background:var(--fill);color:var(--accent);border-radius:12px;padding:8px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans);flex:none;}
 .wiztitle,.wiztitle{font-family:var(--serif);font-weight:700;}
 .wiztitle{font-size:18px;}
 .daychip{display:flex;align-items:baseline;gap:4px;flex:none;}
@@ -1732,6 +1845,7 @@ return (
 .syncrow{display:flex;align-items:center;justify-content:space-between;margin-top:8px;}
 .syncnote{font-size:11px;color:var(--muted);}
 .syncnote.warn{color:#B25000;font-weight:600;}
+.syncbtn{display:inline-flex;align-items:center;gap:4px;background:transparent;color:#B25000;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);}
 .signout{display:inline-flex;align-items:center;gap:5px;background:none;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--sans);padding:2px 0;flex:none;}
 .scroll{flex:1;overflow-y:auto;position:relative;z-index:2;padding-bottom:90px;}
 .scroll.solo{padding-bottom:28px;}
@@ -1754,31 +1868,10 @@ return (
 .homeclock svg{color:var(--accent);flex:none;}
 .homeclock-l{font-weight:600;color:var(--ink);}
 .homeclock-t{margin-left:auto;font-family:var(--mono);color:var(--ink2);font-variant-numeric:tabular-nums;}
-.fxchip{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:var(--surface);border-radius:14px;padding:11px 14px;margin-bottom:12px;box-shadow:var(--shadow);cursor:pointer;font-family:var(--sans);text-align:left;}
-.fxchip:active{transform:scale(.99);}
-.fxchip-rate{font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;}
-.fxchip-arr{color:var(--accent);}
-.fxchip-code{font-size:11px;color:var(--muted);font-weight:600;font-family:var(--mono);}
-.fxbig{font-family:var(--serif);font-size:22px;font-weight:700;letter-spacing:-.02em;margin:4px 0 16px;}
-.fxbig-code{font-size:14px;color:var(--muted);font-weight:600;}
-.fxconv{display:flex;align-items:stretch;gap:9px;}
-.fxconv-cell{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;background:var(--fill);border-radius:12px;padding:10px 12px;}
-.fxconv-cell.out{justify-content:center;}
-.fxconv-code{font-size:11px;color:var(--muted);font-weight:700;font-family:var(--mono);}
-.fxconv-input{background:none;font-size:18px;font-weight:600;color:var(--ink);font-family:var(--sans);width:100%;font-variant-numeric:tabular-nums;}
-.fxconv-out{font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;}
-.fxswap{flex:none;width:40px;background:var(--powder);color:var(--accent);border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;}
-.fxswap:active{background:var(--powder2);}
-.fxnote{margin-top:10px;}
-.fxlist{display:flex;flex-direction:column;}
-.fxlistrow{display:flex;align-items:center;justify-content:space-between;padding:10px 2px;border-top:1px solid var(--line);font-size:14px;}
-.fxlistrow:first-child{border-top:none;}
-.fxlistrow-code{font-family:var(--mono);font-weight:600;color:var(--ink2);font-size:12.5px;}
-.fxlistrow-val{font-weight:600;color:var(--ink);}
 .hero-cond{font-size:14px;color:var(--ink2);margin-top:16px;}
 .weather-input{margin-top:12px;width:100%;background:var(--fill);color:var(--ink);border-radius:12px;padding:11px 13px;font-size:14px;font-family:var(--sans);}
 .weather-input::placeholder{color:var(--muted);}
-.weather-input:focus,.inline-input:focus,.quickadd input:focus,.sel:focus,.authinput:focus{outline:none;box-shadow:0 0 0 4px rgba(31,77,230,.12);}
+.weather-input:focus,.inline-input:focus,.quickadd input:focus,.sel:focus,.authinput:focus{outline:none;box-shadow:0 0 0 4px rgba(65,89,156,.14);}
 .muted{color:var(--muted);} .sm{font-size:14px;line-height:1.45;} .xs{font-size:12.5px;line-height:1.4;color:var(--muted);}
 .reflink{display:inline-flex;align-items:center;gap:6px;margin-top:10px;background:var(--powder);color:var(--accent);border-radius:9px;padding:7px 11px;font-family:var(--mono);font-size:13px;font-weight:500;cursor:pointer;}
 .reflink.xs{font-size:12px;padding:5px 9px;margin-top:7px;}
@@ -1847,12 +1940,18 @@ return (
 .del{background:none;color:var(--muted);cursor:pointer;padding:5px;flex:none;transition:.12s;}.del:active{color:var(--ink);transform:scale(.9);}
 .photopicker{margin:7px 0 8px;}.photobtn{display:inline-flex;align-items:center;gap:7px;background:var(--fill);color:var(--ink);border-radius:12px;padding:11px 13px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:7px;}.photobtn input{display:none;}
 .photochips,.photogrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px;}.photochip,.photogrid button{position:relative;aspect-ratio:1;background:var(--fill);border-radius:12px;overflow:hidden;cursor:pointer;}.photochip img,.photogrid img{width:100%;height:100%;object-fit:cover;display:block;}.photochip span{position:absolute;right:4px;top:3px;background:rgba(29,29,31,.72);color:white;border-radius:999px;width:18px;height:18px;line-height:17px;font-size:14px;}
+.recapphotos{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px;}.recapphotos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;background:var(--fill);}
+.capturelead,.sharehero{display:flex;align-items:flex-start;gap:10px;background:var(--powder);color:var(--accent);border-radius:16px;padding:13px 14px;margin-bottom:12px;font-size:14px;font-weight:700;}.sharehero span{display:block;color:var(--ink2);font-size:12.5px;font-weight:500;margin-top:3px;line-height:1.35;}
+.shareblock{margin-bottom:16px;}.section-label.tight{margin-top:10px;}.memberlist{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}.memberrow{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border-radius:14px;padding:12px 13px;box-shadow:var(--shadow);}.memberemail{font-size:14px;font-weight:700;color:var(--ink);}
+.recaphero,.publichero{background:linear-gradient(135deg,#FFFFFF 0%,#EEF1F6 100%);border-radius:22px;padding:22px;margin-bottom:12px;box-shadow:var(--shadow);}.recaphero h2{font-family:var(--serif);font-size:28px;line-height:1.05;letter-spacing:-.025em;margin:6px 0 8px;}.bestline{display:flex;align-items:center;gap:7px;color:var(--accent);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;margin-bottom:8px;}
+.publicrecap{padding:22px 20px 34px;min-height:100vh;background:var(--bg);}
 .viewer{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.86);display:flex;align-items:center;justify-content:center;padding:18px;}.viewer img{max-width:100%;max-height:82vh;border-radius:16px;}.viewer-x{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .viewer-dots{position:absolute;bottom:calc(26px + env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:center;gap:8px;}
 .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);cursor:pointer;padding:0;transition:.15s;}
 .dot.on{background:#fff;}
+.capturefab{position:fixed;right:calc(50% - 246px);bottom:calc(82px + env(safe-area-inset-bottom));z-index:31;display:flex;align-items:center;gap:7px;background:var(--accent);color:#fff;border-radius:999px;padding:12px 15px;font-size:14px;font-weight:800;font-family:var(--sans);box-shadow:var(--shadow-float);cursor:pointer;}
 .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);box-shadow:0 -1px 0 rgba(0,0,0,.04);display:flex;z-index:30;padding:9px 4px calc(9px + env(safe-area-inset-bottom));}
-.tab{flex:1;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 2px;cursor:pointer;color:var(--muted);font-family:var(--sans);transition:.12s;}.tab span{font-size:10.5px;font-weight:500;}.tab.active{color:var(--accent);}.tab:active{transform:scale(.93);}
+.tab{flex:1;min-width:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 2px;cursor:pointer;color:var(--muted);font-family:var(--sans);transition:.12s;}.tab span{font-size:10px;font-weight:500;}.tab.active{color:var(--accent);}.tab:active{transform:scale(.93);}
 .toast{position:fixed;bottom:92px;left:50%;transform:translateX(-50%);background:rgba(29,29,31,.92);backdrop-filter:blur(12px);color:#fff;font-size:14px;font-weight:500;padding:11px 20px;border-radius:14px;z-index:40;animation:rise .25s;box-shadow:var(--shadow-float);}
 .citytabs{display:flex;gap:0;background:var(--fill);border-radius:12px;padding:3px;margin-bottom:10px;}
 .citytabs.scrollx{overflow-x:auto;}
@@ -1861,8 +1960,6 @@ return (
 .placecard{display:flex;gap:11px;background:var(--surface);border-radius:14px;padding:14px;margin-bottom:9px;box-shadow:var(--shadow);transition:.15s;}.placecard.been{background:var(--powder);}.placecheck{background:none;padding:0;cursor:pointer;flex:none;margin-top:1px;}.place-body{flex:1;min-width:0;}.place-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}.place-name{font-size:15.5px;font-weight:600;letter-spacing:-.01em;}
 .vibetag{flex:none;background:var(--powder);color:var(--accent);border-radius:999px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;}.vibetag.inline{margin-left:8px;padding:1px 8px;font-size:10px;vertical-align:middle;}
 .place-actions{margin-top:10px;}.addday,.planpill{display:inline-flex;align-items:center;gap:6px;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}.addday{background:var(--accent);color:#fff;}.planpill{background:var(--fill);color:var(--ink);}.daypicker{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px;}.dpbtn{background:var(--fill);color:var(--ink);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:var(--sans);}.dpbtn.on{background:var(--accent);color:#fff;}.dpbtn.clear{background:transparent;color:var(--muted);}
-.maplink{display:inline-flex;align-items:center;gap:6px;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);background:var(--fill);color:var(--ink2);text-decoration:none;margin-left:7px;}
-.maplink:active{background:var(--fill2);}
 .addplace{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--fill);color:var(--ink);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:6px;}.btnrow{display:flex;gap:8px;}.primary.grow{width:auto;flex:1;}.ghostbtn{background:var(--fill);color:var(--ink2);border-radius:14px;padding:13px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);flex:none;}.ghostbtn.sm{padding:8px 13px;border-radius:10px;}.ghostbtn.block{width:100%;margin-top:8px;}
 .nudge{width:100%;display:flex;align-items:center;gap:9px;background:var(--powder);color:var(--accent);border-radius:14px;padding:13px 15px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-bottom:12px;}.prompt-q{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:-.01em;margin-bottom:10px;}
 .privsec{background:var(--surface);border-radius:18px;padding:15px 16px;margin-bottom:10px;box-shadow:var(--shadow);border:1px solid var(--powder2);}
@@ -1875,9 +1972,6 @@ return (
 .privrow-body{flex:1;min-width:0;}
 .privrow-title{font-size:14.5px;font-weight:600;color:var(--ink);letter-spacing:-.01em;}
 .privadd{display:inline-flex;align-items:center;gap:6px;background:var(--fill);color:var(--ink);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:4px;}
-.privupload{display:inline-flex;align-items:center;gap:6px;background:var(--powder);color:var(--accent);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);margin-top:4px;margin-left:8px;}
-.privupload input{display:none;}
-.privmap{display:inline-flex;align-items:center;gap:5px;margin-top:7px;background:var(--powder);color:var(--accent);border-radius:9px;padding:5px 9px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;}
 .privadd-form{margin-top:10px;}
 .authwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);}
 .authcard{width:100%;max-width:360px;background:var(--surface);border-radius:22px;padding:28px 24px;box-shadow:var(--shadow-float);text-align:center;}
@@ -1919,7 +2013,7 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .emptytrips-h{font-family:var(--serif);font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px;}
 .chips{display:flex;flex-wrap:wrap;gap:7px;}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--powder);color:var(--accent);border-radius:999px;padding:6px 8px 6px 13px;font-size:13px;font-weight:600;}
-.chip button{background:rgba(31,77,230,.18);color:var(--accent);border-radius:999px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.chip button{background:rgba(65,89,156,.18);color:var(--accent);border-radius:999px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .resolved{display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .resolved>div{display:flex;flex-direction:column;font-size:15px;font-weight:600;gap:2px;}
 .resolved>div svg{color:var(--accent);vertical-align:-2px;margin-right:5px;}
@@ -1958,9 +2052,6 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 @media (min-width:1280px){
   .app{max-width:1080px;}
   .page.wide{max-width:1040px;}
-}
-@media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important;}
 }
 `}</style>
 );

@@ -9,8 +9,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Le Grand Tour">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%231F4DE6%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%231F4DE6%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%2341599C%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20180%20180%27%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20rx%3D%2742%27%20fill%3D%27%2341599C%27/%3E%3Cpath%20d%3D%27M50%20130%20L132%2090%20L50%2050%20L50%2084%20L104%2090%20L50%2096%20Z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E">
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Le%20Grand%20Tour%22%2C%22short_name%22%3A%22Le%20Grand%20Tour%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23F2F2F7%22%2C%22theme_color%22%3A%22%23F2F2F7%22%2C%22start_url%22%3A%22./%22%2C%22scope%22%3A%22./%22%7D">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1685,9 +1685,9 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
 maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO',
 }).addTo(map);
 const latlngs = stops.map(s => [s.lat, s.lon]);
-L.polyline(latlngs, { color: "#1F4DE6", weight: 3, opacity: .85, dashArray: "6,9" }).addTo(map);
+L.polyline(latlngs, { color: "#41599C", weight: 3, opacity: .85, dashArray: "6,9" }).addTo(map);
 stops.forEach((s, i) => {
-L.circleMarker([s.lat, s.lon], { radius: 7, color: "#fff", weight: 2.5, fillColor: "#1F4DE6", fillOpacity: 1 })
+L.circleMarker([s.lat, s.lon], { radius: 7, color: "#fff", weight: 2.5, fillColor: "#41599C", fillOpacity: 1 })
 .addTo(map).bindTooltip(`${i + 1}. ${s.name}`, { direction: "top", offset: [0, -6] });
 });
 map.fitBounds(latlngs, { padding: [34, 34] });
@@ -1911,7 +1911,7 @@ return (
 :root{
 --bg:#F2F2F7; --surface:#FFFFFF; --fill:#EDEDF2; --fill2:#E5E5EA;
 --ink:#1D1D1F; --ink2:#6E6E73; --muted:#8E8E93;
---accent:#1F4DE6; --accent-d:#163BBD; --powder:#EAF0FF; --powder2:#C9D8FF;
+--accent:#41599C; --accent-d:#314779; --powder:#EEF1F6; --powder2:#D7DEEE;
 --paper:#F2F2F7; --paper2:#EDEDF2; --card:#FFFFFF; --line:#EDEDF2; --line2:#C7C7CC;
 --c-meal:#C2410C; --c-meal-bg:#FBEAE0;
 --warn:#B25000; --warn-bg:#FFF1E2;
@@ -2012,7 +2012,7 @@ color-scheme:dark;
 .hero-cond{font-size:14px;color:var(--ink2);margin-top:16px;}
 .weather-input{margin-top:12px;width:100%;background:var(--fill);color:var(--ink);border-radius:0;padding:11px 13px;font-size:14px;font-family:var(--sans);}
 .weather-input::placeholder{color:var(--muted);}
-.weather-input:focus,.inline-input:focus,.quickadd input:focus,.sel:focus,.authinput:focus{outline:none;box-shadow:0 0 0 4px rgba(31,77,230,.12);}
+.weather-input:focus,.inline-input:focus,.quickadd input:focus,.sel:focus,.authinput:focus{outline:none;box-shadow:0 0 0 4px rgba(65,89,156,.14);}
 .device-banner{background:var(--powder);color:var(--accent);border-radius:0;padding:12px 14px;font-size:13px;font-weight:600;margin-bottom:12px;line-height:1.35;}
 .row-icon{display:flex;align-items:center;gap:8px;color:var(--ink);}
 .row-title{font-weight:600;font-size:15px;color:var(--ink);}
@@ -2187,7 +2187,7 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .sortbtn{display:inline-flex;align-items:center;gap:6px;background:var(--powder);color:var(--accent);border-radius:0;padding:7px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}
 .sortbtn:disabled{opacity:.6;}
 /* ===== Tour recap ===== */
-.recaphero{background:linear-gradient(135deg,#1F4DE6 0%,#3A63FF 100%);color:#fff;border-radius:22px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow);}
+.recaphero{background:linear-gradient(135deg,#41599C 0%,#6F82BC 100%);color:#fff;border-radius:22px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow);}
 .recaphero-kicker{font-size:11px;font-weight:700;letter-spacing:.08em;opacity:.85;}
 .recaphero-title{font-family:var(--serif);font-size:30px;font-weight:800;letter-spacing:-.02em;margin-top:4px;line-height:1.05;}
 .recaphero-route{display:flex;align-items:center;gap:7px;font-size:13px;margin-top:14px;opacity:.96;line-height:1.4;font-weight:500;}
@@ -2206,6 +2206,56 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .photo-credit{font-size:11px;color:var(--muted);line-height:1.5;margin:18px 4px 4px;text-align:center;}
 /* header share + auth actions */
 .syncactions{display:flex;align-items:center;gap:14px;}
+/* Desktop scale-up for the personal Le Grand Tour app */
+@media (min-width:900px){
+body{background:linear-gradient(180deg,#F7F8FB 0%,#ECEFF5 100%);}
+.app{max-width:1180px;min-height:100vh;background:var(--bg);box-shadow:0 0 0 1px rgba(0,0,0,.04),0 18px 60px rgba(16,24,40,.08);}
+.topbar{padding:22px 32px 16px;}
+.topbar-row,.syncrow,.progress{max-width:1120px;margin-left:auto;margin-right:auto;}
+.brandline{font-size:34px;}
+.kicker{font-size:12px;}
+.daychip-num{font-size:20px;}
+.scroll{padding-bottom:112px;}
+.page{max-width:1120px;margin:0 auto;padding:28px 32px 32px;}
+.page-h{font-size:40px;margin:4px 2px 22px;}
+.hero{padding:28px;margin-bottom:16px;}
+.hero-img{height:290px;width:calc(100% + 56px);margin:-28px -28px 22px;}
+.hero-city{font-size:42px;max-width:780px;}
+.hero-date,.hero-country,.hero-cond{font-size:15px;}
+.hero-weather{min-width:126px;}
+.hero-temp{font-size:26px;}
+.card,.daycard,.placecard,.privsec,.capture,.storycard{box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 34px rgba(16,24,40,.06);}
+.card{padding:18px;}
+.ministats,.journal-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.journal-stats{margin-bottom:10px;}
+.photogrid{grid-template-columns:repeat(6,1fr);}
+.photogrid.gallery{grid-template-columns:repeat(3,1fr);}
+.recapgrid{grid-template-columns:repeat(4,1fr);}
+.tripmap{height:390px;}
+.sheetcard{max-width:640px;border-radius:0;padding:22px 22px calc(22px + env(safe-area-inset-bottom));}
+.tabbar{width:auto;max-width:760px;min-width:620px;bottom:24px;border:1px solid var(--line);box-shadow:0 16px 46px rgba(16,24,40,.16);padding:10px 12px;border-radius:0;background:rgba(255,255,255,.92);}
+.tab{min-width:104px;flex-direction:row;justify-content:center;gap:7px;padding:9px 14px;}
+.tab span{font-size:13px;font-weight:700;}
+.toast{bottom:106px;}
+.authcard{max-width:420px;padding:34px 30px;}
+.authbrand{font-size:34px;}
+}
+@media (min-width:1000px){
+@supports selector(:has(*)){
+.page:has(> .hero){display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:16px;align-items:start;}
+.page:has(> .hero)>.hero,.page:has(> .hero)>.nudge,.page:has(> .hero)>.ministats{grid-column:1/-1;}
+.page:has(> .hero)>.section-label{grid-column:2;margin-top:0;}
+.page:has(> .hero)>.card{grid-column:2;}
+.page:has(> .hero)>.privsec,.page:has(> .hero)>.homeclock,.page:has(> .hero)>.mapday{grid-column:1;}
+.page:has(> .daycard){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.page:has(> .daycard)>.page-h{grid-column:1/-1;}
+.page:has(> .daycard)>.daycard{margin-bottom:0;}
+.page:has(> .recaphero){display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,.55fr);gap:16px;align-items:start;}
+.page:has(> .recaphero)>.recaphero,.page:has(> .recaphero)>.storycard,.page:has(> .recaphero)>.storybtn,.page:has(> .recaphero)>.tripmap,.page:has(> .recaphero)>.recap-cap{grid-column:1;}
+.page:has(> .recaphero)>.section-label,.page:has(> .recaphero)>.card,.page:has(> .recaphero)>.ministats{grid-column:2;}
+.page:has(> .recaphero)>.photogrid{grid-column:1/-1;}
+}
+}
 /* gentle page transition on tab switch */
 @media (prefers-reduced-motion:no-preference){
 .page{animation:pagein .26s cubic-bezier(.2,.8,.2,1) both;}
