@@ -1053,18 +1053,26 @@ const groups = PRIVATE_TYPE_ORDER
 .filter(g => g.items.length);
 const cityHint = (() => { const c = (ITINERARY[dayIndex] || {}).city || ""; return c === "Transit" ? "" : c; })();
 
-const del = async (id) => {
+const del = (id) => {
 const prev = state.privateNotes;
-setState(s => ({ ...s, privateNotes: (s.privateNotes || []).filter(n => n.id !== id) }));
-try { await db.deletePrivateNote(id); flash("Private note removed"); }
-catch (e) { flash("Delete failed"); setState(s => ({ ...s, privateNotes: prev })); }
+mutate(ctx, {
+apply: () => setState(s => ({ ...s, privateNotes: (s.privateNotes || []).filter(n => n.id !== id) })),
+revert: () => setState(s => ({ ...s, privateNotes: prev })),
+op: { kind: "deletePrivateNote", args: { id } },
+dbCall: () => db.deletePrivateNote(id),
+});
+flash("Private note removed");
 };
-const addNote = async (note) => {
+const addNote = (note) => {
 const entry = { id: uid(), day: dayIndex, type: note.type, title: note.title, body: note.body, ref: note.ref, url: "", sort_order: 0 };
-setState(s => ({ ...s, privateNotes: [ ...(s.privateNotes || []), entry ] }));
 setAdding(false);
-try { await db.addPrivateNote(entry); flash("Private note added"); }
-catch (e) { flash("Could not save note"); }
+mutate(ctx, {
+apply: () => setState(s => ({ ...s, privateNotes: [ ...(s.privateNotes || []), entry ] })),
+revert: () => setState(s => ({ ...s, privateNotes: (s.privateNotes || []).filter(n => n.id !== entry.id) })),
+op: { kind: "addPrivateNote", args: { note: entry } },
+dbCall: () => db.addPrivateNote(entry),
+});
+flash("Private note added");
 };
 
 // Upload a PDF or photo of a ticket/itinerary; the assistant extracts the
@@ -1080,8 +1088,7 @@ const items = await aiExtractDoc(file, session && session.access_token);
 if (!items.length) { flash("No travel details found in that file"); }
 else {
 const added = items.map(it => ({ id: uid(), day: dayIndex, type: PRIVATE_TYPE_ORDER.includes(it.type) ? it.type : "note", title: it.title || "Booking", body: it.body || "", ref: it.ref || "", url: "", sort_order: 0 }));
-setState(s => ({ ...s, privateNotes: [ ...(s.privateNotes || []), ...added ] }));
-for (const entry of added) { try { await db.addPrivateNote(entry); } catch (err) {} }
+for (const entry of added) { mutate(ctx, { apply: () => setState(s => ({ ...s, privateNotes: [ ...(s.privateNotes || []), entry ] })), revert: () => setState(s => ({ ...s, privateNotes: (s.privateNotes || []).filter(n => n.id !== entry.id) })), op: { kind: "addPrivateNote", args: { note: entry } }, dbCall: () => db.addPrivateNote(entry) }); }
 flash(`Added ${added.length} ${added.length === 1 ? "item" : "items"} from your document`);
 setAdding(false);
 }
