@@ -52,6 +52,10 @@ const SUPABASE_ANON_KEY = "sb_publishable_wJzyj475A-WKVt6RdLJZCQ_OvHKzxV7";
 const PHOTO_BUCKET = "journal-photos";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Tables whose changes should trigger a live refetch. (Realtime is enabled on
+// these in the Supabase publication.) Task adds trip_settings later.
+const REALTIME_TABLES = ["places", "place_status", "journal_entries", "journal_photos", "inbox", "private_notes"];
+
 /* ============================== DATA ============================== */
 
 const TRIP = { start: "2026-06-04", end: "2026-06-22", total: 19 };
@@ -769,6 +773,7 @@ useEffect(() => {
   })();
 }, []);
 const localPrefs = useRef({ weather:{}, planDone:{}, planAdd:{}, hotels:{} });
+const isFetching = useRef(false);
 const [theme, setTheme] = useState(() => {
   try { return localStorage.getItem("lgt:theme") || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch(e){ return "light"; }
 });
@@ -807,6 +812,8 @@ return () => { sub.subscription.unsubscribe(); };
 }, []);
 
 const refresh = async () => {
+if (isFetching.current) return;
+isFetching.current = true;
 try {
 const shared = await loadAll();
 // Private logistics are fetched ONLY when authenticated. Viewer mode never requests them.
@@ -818,6 +825,7 @@ try { localStorage.setItem("euro26:shared", JSON.stringify({ journal: shared.jou
 setStale(false);
 setLoaded(true);
 } catch (e) { setStale(true); setLoaded(true); }
+finally { isFetching.current = false; }
 };
 
 // Refetch shared data whenever the app returns to the foreground, so two
@@ -826,6 +834,20 @@ useEffect(() => {
 const onVis = () => { if (document.visibilityState === "visible" && (session || viewerMode)) refresh(); };
 document.addEventListener("visibilitychange", onVis);
 return () => document.removeEventListener("visibilitychange", onVis);
+}, [session, viewerMode]);
+
+// Live sync: subscribe to shared-table changes and debounce a refetch.
+// Reuses refresh() so the result is always consistent with the load path.
+// The visibilitychange effect above remains as a fallback if realtime drops.
+useEffect(() => {
+if (!session && !viewerMode) return;
+const bumped = debounce(() => { refresh(); }, 300);
+const ch = supabase.channel("trip");
+REALTIME_TABLES.forEach(t =>
+ch.on("postgres_changes", { event: "*", schema: "public", table: t }, bumped)
+);
+ch.subscribe();
+return () => { bumped.cancel(); supabase.removeChannel(ch); };
 }, [session, viewerMode]);
 
 useEffect(() => {
