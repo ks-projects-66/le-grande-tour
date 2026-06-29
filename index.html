@@ -186,6 +186,15 @@ const plannedDay = ("plannedDay" in st) ? st.plannedDay : (p.defaultDay != null 
 return { ...p, seed: SEED_IDS.has(p.id), plannedDay, been: !!st.been, rated: !!st.rated };
 });
 }
+// Normalised key for duplicate detection: name (letters/digits only, accent-folded)
+// + lowercased city. Two places with the same key are considered the same place.
+function placeKey(name, city) {
+  return (name || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "") + "|" + (city || "").toLowerCase().trim();
+}
+function findDup(places, name, city, exceptId) {
+  const k = placeKey(name, city);
+  return (places || []).find(p => p.id !== exceptId && placeKey(p.name, p.city) === k) || null;
+}
 function heroPhoto(state, dayIndex, city) {
   const j = (state.journal || []);
   // Prefer a photo logged on this exact day, else any photo from this city.
@@ -1460,7 +1469,7 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style
 // Edit an Explore place in place. Curated seed places can be edited (the change
 // is saved as a database override) but not deleted; user-added places can be both.
 function EditPlace({ place, inboxId, ctx, onClose }) {
-const { setState, flash, db, canEdit } = ctx;
+const { setState, flash, db, canEdit, state } = ctx;
 const seed = SEED_IDS.has(place.id);
 const [name, setName] = useState(place.name || "");
 const [city, setCity] = useState(place.city || EXPLORE_CITIES[0]);
@@ -1475,6 +1484,8 @@ if (!name.trim()) return;
 if (!canEdit) { flash("Sign in to edit"); return; }
 setBusy(true);
 const saved = { id: place.id, city, cat, tag, name: name.trim(), area: area.trim(), note: note.trim() };
+const dup = findDup(mergedPlaces(state), saved.name, saved.city, saved.id);
+if (dup) { flash(`Already saved — ${dup.name}`); setBusy(false); return; }
 setState(s => {
 const list = s.exploreAdded || [];
 const exists = list.some(x => x.id === saved.id);
@@ -1625,8 +1636,23 @@ confidence: typeof it.confidence === "number" ? it.confidence : 0.6,
 const [review, setReview] = useState(null); // drafts[] for MultiReview, or null
 // Route model items: auto-add the confident ones, review the rest.
 const reviewItems = (items, sourceInboxId) => {
-const drafts = (items || []).map(toDraft).filter(d => d.name);
-if (!drafts.length) { flash("Nothing to add — fill it in"); if (sourceInboxId) { setInboxId(sourceInboxId); setEditing(toDraft({ name: "" })); } return; }
+const drafts0 = (items || []).map(toDraft).filter(d => d.name);
+// Drop anything already saved (same name+city) or repeated within this batch.
+const existing = mergedPlaces(state);
+const seen = new Set();
+const drafts = drafts0.filter(d => {
+  const k = placeKey(d.name, d.city);
+  if (seen.has(k) || findDup(existing, d.name, d.city)) return false;
+  seen.add(k); return true;
+});
+const skipped = drafts0.length - drafts.length;
+if (skipped) flash(`Skipped ${skipped} already saved`);
+if (!drafts.length) {
+  if (skipped) { if (sourceInboxId) removeCapture(sourceInboxId); return; }
+  flash("Nothing to add — fill it in");
+  if (sourceInboxId) { setInboxId(sourceInboxId); setEditing(toDraft({ name: "" })); }
+  return;
+}
 const confident = drafts.filter(d => d.confidence >= AUTOADD_MIN);
 const rest = drafts.filter(d => d.confidence < AUTOADD_MIN);
 if (drafts.length === 1 && !confident.length) { setInboxId(sourceInboxId || null); setEditing(drafts[0]); return; }
@@ -1733,7 +1759,19 @@ return (
 {editing && <EditPlace place={editing} inboxId={inboxId} ctx={ctx} onClose={() => { setEditing(null); setInboxId(null); }} />}
 {review && <MultiReview drafts={review}
 onEdit={(d) => { setReview(null); setEditing(d); }}
-onAdd={(chosen) => { setReview(null); if (chosen.length) { setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), ...chosen ] })); chosen.forEach(p => db.addPlace(p).catch(() => {})); flash(`Added ${chosen.length} place${chosen.length === 1 ? "" : "s"}`); } }}
+onAdd={(chosen) => {
+  setReview(null);
+  const existing = mergedPlaces(state);
+  const seen = new Set();
+  const add = (chosen || []).filter(d => {
+    const k = placeKey(d.name, d.city);
+    if (seen.has(k) || findDup(existing, d.name, d.city)) return false;
+    seen.add(k); return true;
+  });
+  const skipped = (chosen || []).length - add.length;
+  if (add.length) { setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), ...add ] })); add.forEach(p => db.addPlace(p).catch(() => {})); }
+  flash(add.length ? `Added ${add.length} place${add.length === 1 ? "" : "s"}${skipped ? `, skipped ${skipped}` : ""}` : "Already saved");
+}}
 onClose={() => setReview(null)} />}
 </div>
 );
