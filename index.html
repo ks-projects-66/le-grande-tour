@@ -1573,8 +1573,13 @@ if (!canEdit) { flash("Sign in to capture"); return; }
 const item = { id: uid(), raw: text, kind: text.toLowerCase().startsWith("http") ? "link" : "note", city: "", sorted: false, created_at: new Date().toISOString() };
 setState(s => ({ ...s, inbox: [item, ...(s.inbox || [])] }));
 if (typeof text0 !== "string") setCap("");
-db.addInbox(item).catch(() => flash("Could not save capture"));
-if (autoSort) sortItem(item);
+if (autoSort) {
+  // Auto-sort: keep the optimistic tray row for the brief "Sorting…" state,
+  // but skip the DB write — reviewItems removes the row on a confident result.
+  sortItem(item);
+} else {
+  db.addInbox(item).catch(() => flash("Could not save capture"));
+}
 };
 const [capturing, setCapturing] = useState(false);
 const captureFiles = async (fileList) => {
