@@ -1721,14 +1721,19 @@ const text = (typeof text0 === "string" ? text0 : cap).trim();
 if (!text) return;
 if (!canEdit) { flash("Sign in to capture"); return; }
 const item = { id: uid(), raw: text, kind: text.toLowerCase().startsWith("http") ? "link" : "note", city: "", sorted: false, created_at: new Date().toISOString() };
-setState(s => ({ ...s, inbox: [item, ...(s.inbox || [])] }));
 if (typeof text0 !== "string") setCap("");
 if (autoSort) {
   // Auto-sort: keep the optimistic tray row for the brief "Sorting…" state,
   // but skip the DB write — reviewItems removes the row on a confident result.
+  setState(s => ({ ...s, inbox: [item, ...(s.inbox || [])] }));
   sortItem(item);
 } else {
-  db.addInbox(item).catch(() => flash("Could not save capture"));
+  mutate(ctx, {
+  apply: () => setState(s => ({ ...s, inbox: [item, ...(s.inbox || [])] })),
+  revert: () => setState(s => ({ ...s, inbox: (s.inbox || []).filter(i => i.id !== item.id) })),
+  op: { kind: "addInbox", args: { item } },
+  dbCall: () => db.addInbox(item),
+  });
 }
 };
 const [capturing, setCapturing] = useState(false);
@@ -1744,8 +1749,13 @@ const captureFiles = async (fileList) => {
   setCapturing(false);
 };
 const removeCapture = (id) => {
-setState(s => ({ ...s, inbox: (s.inbox || []).filter(i => i.id !== id) }));
-db.deleteInbox(id).catch(() => {});
+const prev = (state.inbox || []).find(i => i.id === id);
+mutate(ctx, {
+apply: () => setState(s => ({ ...s, inbox: (s.inbox || []).filter(i => i.id !== id) })),
+revert: () => { if (prev) setState(s => ({ ...s, inbox: [prev, ...(s.inbox || []).filter(i => i.id !== id)] })); },
+op: { kind: "deleteInbox", args: { id } },
+dbCall: () => db.deleteInbox(id),
+});
 };
 const sortItem = async (it) => {
   setSorting(it.id);
