@@ -40,7 +40,7 @@ import {
 Sun, Moon, Cloud, CloudRain, CloudSun, Plane, TrainFront, Wine, UtensilsCrossed,
 Camera, Sparkles, Check, Plus, Copy, Trash2, Star, ChevronDown, BookOpen,
 CalendarDays, Bed, Globe, Clock, Compass, CalendarPlus, ShoppingBag, ImagePlus, LogOut, Ticket, BellRing, StickyNote,
-X, Map as MapIcon, Pencil, Route, Share2
+X, Map as MapIcon, Pencil, Route, Share2, Settings
 } from "lucide-react";
 import * as Lns from "leaflet";
 const L = Lns.default || Lns;
@@ -729,6 +729,9 @@ const undoToast = (msg, fn) => { setUndo({ msg, fn }); setTimeout(() => setUndo(
 const [stale, setStale] = useState(false);
 const [state, setState] = useState(emptyState);
 const [pendingShare, setPendingShare] = useState(null);
+const [autoSort, setAutoSort] = useState(() => { try { const v = localStorage.getItem("lgt:autosort"); return v === null ? true : v === "1"; } catch (e) { return true; } });
+useEffect(() => { try { localStorage.setItem("lgt:autosort", autoSort ? "1" : "0"); } catch (e) {} }, [autoSort]);
+const [settingsOpen, setSettingsOpen] = useState(false);
 useEffect(() => {
   let sp; try { sp = new URLSearchParams(location.search); } catch (e) { return; }
   if (sp.get("shared") !== "1") return;
@@ -841,7 +844,7 @@ const meals = state.journal.filter(j => j.type === "Meal").length;
 const rated = state.journal.filter(j => j.you > 0);
 const bestMeal = [...state.journal].filter(j => j.type === "Meal").sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
 
-const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare };
+const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare, autoSort, setAutoSort };
 
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session && !viewerMode) return <div className="app"><Style /><AuthScreen onView={() => setViewerMode(true)} /></div>;
@@ -870,6 +873,7 @@ return (
 <button className="signout" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")} aria-label="Toggle theme">
   {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
 </button>
+<button className="signout" onClick={() => setSettingsOpen(true)} aria-label="Trip settings"><Settings size={12} /></button>
 {session
 ? <button className="signout" onClick={signOut}><LogOut size={12} /> Sign out</button>
 : <button className="signout" onClick={() => setViewerMode(false)}>Sign in</button>}
@@ -894,6 +898,7 @@ Couldn't load the latest trip data. Showing what's on this device — tap to ret
 
 {toast && <div className="toast">{toast}</div>}
 {undo && <div className="toast undo" onClick={() => { undo.fn(); setUndo(null); }}>{undo.msg} · <strong>Undo</strong></div>}
+{settingsOpen && <SettingsSheet autoSort={autoSort} setAutoSort={setAutoSort} onClose={() => setSettingsOpen(false)} />}
 
 <nav className="tabbar">
 {[
@@ -1909,6 +1914,20 @@ return (
 
 // Shared iOS-style bottom sheet. Both the journal entry editor and the place
 // editor render their forms inside this, so the sheet chrome is defined once.
+function SettingsSheet({ autoSort, setAutoSort, onClose }) {
+  return (
+    <Sheet title="Trip settings" onClose={onClose}>
+      <div className="setrow">
+        <div>
+          <div className="setrow-l">Auto-sort captures</div>
+          <div className="xs">Run the agent the moment you add a link, photo or note — no extra tap.</div>
+        </div>
+        <button className={"settoggle" + (autoSort ? " on" : "")} role="switch" aria-checked={autoSort} aria-label="Auto-sort captures" onClick={() => setAutoSort(v => !v)}>{autoSort ? <Check size={15} /> : null}</button>
+      </div>
+    </Sheet>
+  );
+}
+
 function Sheet({ title, onClose, children }) {
 return createPortal(
 <div className="sheet" onClick={onClose}>
@@ -2271,6 +2290,11 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .sheethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .sheettitle{font-family:var(--serif);font-size:20px;font-weight:800;letter-spacing:-.02em;}
 .sheetx{width:30px;height:30px;border-radius:0;background:var(--fill2);color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;}
+.setrow{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:8px 2px;}
+.setrow-l{font-size:15px;font-weight:600;color:var(--ink);}
+.settoggle{flex:none;width:26px;height:26px;border-radius:0;background:var(--fill2);display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;margin-top:1px;transition:.15s cubic-bezier(.2,.8,.2,1);}
+.settoggle.on{background:var(--accent);}
+.settoggle:active{transform:scale(.92);}
 .jcard-body.editable{cursor:pointer;}
 /* existing photos inside the edit sheet */
 .photogrid.edit{margin-bottom:10px;}
