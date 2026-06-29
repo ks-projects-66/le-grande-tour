@@ -206,7 +206,8 @@ const js = shared.journal || []; const adds = shared.exploreAdded || []; const s
 let newest = 0; for (const j of js) { if ((j.ts || 0) > newest) newest = j.ts || 0; }
 const stKeys = Object.keys(st);
 let stSum = 0; for (const k of stKeys) { const s = st[k] || {}; stSum += (s.been ? 1 : 0) + (s.rated ? 2 : 0) + ((s.plannedDay == null ? 0 : s.plannedDay + 1) * 4); }
-return `${js.length}:${adds.length}:${stKeys.length}:${newest}:${stSum}:${(shared.names&&shared.names.one)||""}:${(shared.names&&shared.names.two)||""}`;
+let photoCount = 0; for (const j of js) { photoCount += (j.photos || []).length; }
+return `${js.length}:${adds.length}:${stKeys.length}:${newest}:${stSum}:${(shared.names&&shared.names.one)||""}:${(shared.names&&shared.names.two)||""}:${photoCount}`;
 }
 // Normalised key for duplicate detection: name (letters/digits only, accent-folded)
 // + lowercased city. Two places with the same key are considered the same place.
@@ -911,6 +912,13 @@ const shared = await loadAll();
 // Private logistics are fetched ONLY when authenticated. Viewer mode never requests them.
 let priv = { privateNotes: [], inbox: [] };
 if (session) { priv = await loadPrivateNotes(); }
+// Realtime now drives this refetch (last-write-wins). A refetch landing while a
+// journal photo upload is still in-flight (uploads run after mutate returns) can
+// momentarily show the entry without its photos — benign and self-healing once the
+// photo rows arrive and trigger a second realtime event.
+// Note: an OFFLINE "sort into Explore" (EditPlace.save) only queues the upsertPlace
+// op; the secondary plannedDay status write + inbox-row deletion live inside dbCall
+// and don't run offline — they persist on the next online edit.
 setState(s => ({ ...s, ...localPrefs.current, ...shared, ...priv }));
 // Cache the public-read data only (never private notes) for instant/offline display.
 const sig = sharedSig(shared);
@@ -2206,8 +2214,8 @@ return (
 <div className="setblock">
 <div className="setrow-l">Traveller names</div>
 <div className="xs">Used across the journal, ratings and recap.</div>
-<input className="authinput" value={one} onChange={e => setOne(e.target.value)} placeholder="First traveller (e.g. Kim)" aria-label="First traveller name" />
-<input className="authinput" value={two} onChange={e => setTwo(e.target.value)} placeholder="Second traveller (e.g. Harriet)" aria-label="Second traveller name" />
+<input className="authinput" value={one} onChange={e => setOne(e.target.value)} placeholder="First traveller (e.g. Kim)" aria-label="First traveller name" maxLength={12} />
+<input className="authinput" value={two} onChange={e => setTwo(e.target.value)} placeholder="Second traveller (e.g. Harriet)" aria-label="Second traveller name" maxLength={12} />
 <button className="primary" disabled={!dirty} onClick={save}>Save names</button>
 </div>
 )}
