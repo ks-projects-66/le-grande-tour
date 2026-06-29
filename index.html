@@ -1538,7 +1538,7 @@ return (
 }
 
 function Explore(ctx) {
-const { state, setState, tIndex, canEdit, db, flash, session, undoToast, pendingShare, setPendingShare } = ctx;
+const { state, setState, tIndex, canEdit, db, flash, session, undoToast, pendingShare, setPendingShare, autoSort } = ctx;
 const setStatus = useSetStatus(ctx);
 const here = ITINERARY[tIndex].city;
 const startCity = EXPLORE_CITIES.includes(here) ? here : "Paris";
@@ -1574,6 +1574,7 @@ const item = { id: uid(), raw: text, kind: text.toLowerCase().startsWith("http")
 setState(s => ({ ...s, inbox: [item, ...(s.inbox || [])] }));
 if (typeof text0 !== "string") setCap("");
 db.addInbox(item).catch(() => flash("Could not save capture"));
+if (autoSort) sortItem(item);
 };
 const [capturing, setCapturing] = useState(false);
 const captureFiles = async (fileList) => {
