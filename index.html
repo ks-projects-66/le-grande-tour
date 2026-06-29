@@ -198,6 +198,16 @@ const plannedDay = ("plannedDay" in st) ? st.plannedDay : (p.defaultDay != null 
 return { ...p, seed: SEED_IDS.has(p.id), plannedDay, been: !!st.been, rated: !!st.rated };
 });
 }
+// Cheap change signature for the cached shared payload: counts + newest journal
+// timestamp + a status fingerprint. Avoids re-stringifying the whole dataset to
+// localStorage on every realtime-driven refresh when nothing actually changed.
+function sharedSig(shared) {
+const js = shared.journal || []; const adds = shared.exploreAdded || []; const st = shared.exploreStatus || {};
+let newest = 0; for (const j of js) { if ((j.ts || 0) > newest) newest = j.ts || 0; }
+const stKeys = Object.keys(st);
+let stSum = 0; for (const k of stKeys) { const s = st[k] || {}; stSum += (s.been ? 1 : 0) + (s.rated ? 2 : 0) + ((s.plannedDay == null ? 0 : s.plannedDay + 1) * 4); }
+return `${js.length}:${adds.length}:${stKeys.length}:${newest}:${stSum}`;
+}
 // Normalised key for duplicate detection: name (letters/digits only, accent-folded)
 // + lowercased city. Two places with the same key are considered the same place.
 function placeKey(name, city) {
@@ -840,6 +850,7 @@ useEffect(() => {
 }, []);
 const localPrefs = useRef({ weather:{}, planDone:{}, planAdd:{}, hotels:{} });
 const isFetching = useRef(false);
+const lastSharedSig = useRef(null);
 const [theme, setTheme] = useState(() => {
   try { return localStorage.getItem("lgt:theme") || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch(e){ return "light"; }
 });
@@ -889,7 +900,11 @@ let priv = { privateNotes: [], inbox: [] };
 if (session) { priv = await loadPrivateNotes(); }
 setState(s => ({ ...s, ...localPrefs.current, ...shared, ...priv }));
 // Cache the public-read data only (never private notes) for instant/offline display.
+const sig = sharedSig(shared);
+if (sig !== lastSharedSig.current) {
+lastSharedSig.current = sig;
 try { localStorage.setItem("euro26:shared", JSON.stringify({ journal: shared.journal, exploreAdded: shared.exploreAdded, exploreStatus: shared.exploreStatus })); } catch (e) {}
+}
 setStale(false);
 setLoaded(true);
 } catch (e) { setStale(true); setLoaded(true); }
