@@ -1027,9 +1027,14 @@ Couldn't load the latest trip data. Showing what's on this device — tap to ret
 // Optimistic place_status writer: update UI immediately, persist to Supabase.
 function useSetStatus(ctx) {
 return (id, patch) => {
-ctx.setState(s => ({ ...s, exploreStatus: { ...s.exploreStatus, [id]: { ...(s.exploreStatus[id] || {}), ...patch } } }));
-if (ctx.canEdit) { ctx.db.upsertStatus(id, patch).catch(() => ctx.flash("Sync failed — retry")); }
-else ctx.flash("Sign in to make changes");
+if (!ctx.canEdit) { ctx.flash("Sign in to make changes"); return; }
+const prev = ctx.state.exploreStatus[id];
+mutate(ctx, {
+apply: () => ctx.setState(s => ({ ...s, exploreStatus: { ...s.exploreStatus, [id]: { ...(s.exploreStatus[id] || {}), ...patch } } })),
+revert: () => ctx.setState(s => { const next = { ...s.exploreStatus }; if (prev === undefined) delete next[id]; else next[id] = prev; return { ...s, exploreStatus: next }; }),
+op: { kind: "upsertStatus", args: { placeId: id, patch } },
+dbCall: () => ctx.db.upsertStatus(id, patch),
+});
 };
 }
 
