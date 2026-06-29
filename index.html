@@ -946,12 +946,13 @@ const signOut = async () => { await supabase.auth.signOut(); setState(emptyState
 const setLocal = (updater) => setState(s => { const next = typeof updater === "function" ? updater(s) : { ...s, ...updater }; persistPrefs(next); return next; });
 
 const canEdit = !!session;
+const places = useMemo(() => mergedPlaces(state), [state.exploreAdded, state.exploreStatus]);
 const wines = state.journal.filter(j => j.type === "Wine").length;
 const meals = state.journal.filter(j => j.type === "Meal").length;
 const rated = state.journal.filter(j => j.you > 0);
 const bestMeal = [...state.journal].filter(j => j.type === "Meal").sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
 
-const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare, autoSort, setAutoSort, setPending };
+const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare, autoSort, setAutoSort, setPending, places };
 
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session && !viewerMode) return <div className="app"><Style /><AuthScreen onView={() => setViewerMode(true)} /></div>;
@@ -1164,18 +1165,18 @@ return (
 /* ============================== TODAY ============================== */
 
 function Today(ctx) {
-const { state, setLocal, tIndex, copy, setTab, canEdit } = ctx;
+const { state, setLocal, tIndex, copy, setTab, canEdit, places } = ctx;
 const setStatus = useSetStatus(ctx);
 const d = ITINERARY[tIndex];
 const clim = CLIMATE[d.w];
 const live = useLiveWeather(d.w);
 const tzHere = TZ[d.w] || TZ.Sydney;
 const wOverride = state.weather[tIndex] || "";
-const toRate = mergedPlaces(state).filter(p => p.been && !p.rated).length;
-const exploreToday = mergedPlaces(state).filter(p => p.plannedDay === tIndex);
+const toRate = places.filter(p => p.been && !p.rated).length;
+const exploreToday = places.filter(p => p.plannedDay === tIndex);
 const planItems = (d.plan || []).map((t, j) => ({ id: `d${tIndex}-p${j}`, t })).concat((state.planAdd[tIndex] || []).map(p => ({ ...p, custom: true })));
 const done = state.planDone[tIndex] || {};
-const donePlaces = mergedPlaces(state).filter(p => p.been).length;
+const donePlaces = places.filter(p => p.been).length;
 const toggle = (id) => setLocal(s => ({ ...s, planDone: { ...s.planDone, [tIndex]: { ...(s.planDone[tIndex] || {}), [id]: !(s.planDone[tIndex] || {})[id] } } }));
 const removePlan = (id) => setLocal(s => ({ ...s, planAdd: { ...s.planAdd, [tIndex]: (s.planAdd[tIndex] || []).filter(x => x.id !== id) } }));
 const mapUrl = mapDayUrl(exploreToday);
@@ -1260,7 +1261,7 @@ value={wOverride} onChange={e => setLocal(s => ({ ...s, weather: { ...s.weather,
 /* ============================== DAYS ============================== */
 
 function Days(ctx) {
-const { state, setLocal, tIndex, copy, canEdit } = ctx;
+const { state, setLocal, tIndex, copy, canEdit, places } = ctx;
 const setStatus = useSetStatus(ctx);
 const [open, setOpen] = useState({ [tIndex]: true });
 const toggleOpen = (i) => setOpen(o => ({ ...o, [i]: !o[i] }));
@@ -1275,7 +1276,7 @@ const isOpen = open[i];
 const isToday = i === tIndex;
 const planItems = (d.plan || []).map((t, j) => ({ id: `d${i}-p${j}`, t })).concat((state.planAdd[i] || []).map(p => ({ ...p, custom: true })));
 const done = state.planDone[i] || {};
-const exploreDay = mergedPlaces(state).filter(p => p.plannedDay === i);
+const exploreDay = places.filter(p => p.plannedDay === i);
 const dayMapUrl = mapDayUrl(exploreDay);
 return (
 <div key={i} className={"daycard" + (isToday ? " today" : "")} style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}>
@@ -1332,7 +1333,7 @@ onClick={() => setStatus(p.id, { been: !p.been })}>
 /* ============================== JOURNAL ============================== */
 
 function Journal(ctx) {
-const { state, setState, tIndex, stats, flash, canEdit, db, refresh } = ctx;
+const { state, setState, tIndex, stats, flash, canEdit, db, refresh, places } = ctx;
 const setStatus = useSetStatus(ctx);
 const d = ITINERARY[tIndex];
 const [type, setType] = useState("Meal");
@@ -1387,7 +1388,7 @@ dbCall: () => db.deleteJournal(id),
 });
 };
 const avg = (k) => stats.rated.length ? (stats.rated.reduce((a, j) => a + j[k], 0) / stats.rated.length).toFixed(1) : "–";
-const toRate = mergedPlaces(state).filter(p => p.been && !p.rated);
+const toRate = places.filter(p => p.been && !p.rated);
 
 // Group entries by trip day so the journal reads like a dated diary: newest
 // day first, entries within a day newest first. Entries with no day fall into
@@ -1602,7 +1603,7 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style
 // Edit an Explore place in place. Curated seed places can be edited (the change
 // is saved as a database override) but not deleted; user-added places can be both.
 function EditPlace({ place, inboxId, ctx, onClose }) {
-const { setState, flash, db, canEdit, state } = ctx;
+const { setState, flash, db, canEdit, state, places } = ctx;
 const seed = SEED_IDS.has(place.id);
 const [name, setName] = useState(place.name || "");
 const [city, setCity] = useState(place.city || EXPLORE_CITIES[0]);
@@ -1625,7 +1626,7 @@ if (!name.trim()) return;
 if (!canEdit) { flash("Sign in to edit"); return; }
 setBusy(true);
 const saved = { id: place.id, city, cat, tag, name: name.trim(), area: area.trim(), note: note.trim() };
-const dup = findDup(mergedPlaces(state), saved.name, saved.city, saved.id);
+const dup = findDup(places, saved.name, saved.city, saved.id);
 if (dup) { flash(`Already saved — ${dup.name}`); setBusy(false); return; }
 const prevList = state.exploreAdded || [];
 const prevExists = prevList.some(x => x.id === saved.id);
@@ -1717,7 +1718,7 @@ return (
 }
 
 function Explore(ctx) {
-const { state, setState, tIndex, canEdit, db, flash, session, undoToast, pendingShare, setPendingShare, autoSort } = ctx;
+const { state, setState, tIndex, canEdit, db, flash, session, undoToast, pendingShare, setPendingShare, autoSort, places: allPlaces } = ctx;
 const setStatus = useSetStatus(ctx);
 const here = ITINERARY[tIndex].city;
 const startCity = EXPLORE_CITIES.includes(here) ? here : "Paris";
@@ -1730,7 +1731,7 @@ const [cap, setCap] = useState("");
 const [sorting, setSorting] = useState(null);
 const [inboxId, setInboxId] = useState(null);
 
-const places = mergedPlaces(state).filter(p => p.city === city);
+const places = allPlaces.filter(p => p.city === city);
 const vibesHere = ["All", ...Array.from(new Set(places.map(p => p.tag)))];
 const shown = vibe === "All" ? places : places.filter(p => p.tag === vibe);
 const doneCount = places.filter(p => p.been).length;
@@ -1820,7 +1821,7 @@ const [review, setReview] = useState(null); // drafts[] for MultiReview, or null
 const reviewItems = (items, sourceInboxId) => {
 const drafts0 = (items || []).map(toDraft).filter(d => d.name);
 // Drop anything already saved (same name+city) or repeated within this batch.
-const existing = mergedPlaces(state);
+const existing = allPlaces;
 const seen = new Set();
 const drafts = drafts0.filter(d => {
   const k = placeKey(d.name, d.city);
@@ -1947,7 +1948,7 @@ return (
 onEdit={(d) => { setReview(null); setEditing(d); }}
 onAdd={(chosen) => {
   setReview(null);
-  const existing = mergedPlaces(state);
+  const existing = allPlaces;
   const seen = new Set();
   const add = (chosen || []).filter(d => {
     const k = placeKey(d.name, d.city);
