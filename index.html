@@ -1034,7 +1034,7 @@ Couldn't load the latest trip data. Showing what's on this device — tap to ret
 
 {toast && <div className="toast">{toast}</div>}
 {undo && <div className="toast undo" onClick={() => { undo.fn(); setUndo(null); }}>{undo.msg} · <strong>Undo</strong></div>}
-{settingsOpen && <SettingsSheet autoSort={autoSort} setAutoSort={setAutoSort} onClose={() => setSettingsOpen(false)} />}
+{settingsOpen && <SettingsSheet ctx={ctx} autoSort={autoSort} setAutoSort={setAutoSort} onClose={() => setSettingsOpen(false)} />}
 
 <nav className="tabbar">
 {[
@@ -2183,18 +2183,43 @@ return (
 
 // Shared iOS-style bottom sheet. Both the journal entry editor and the place
 // editor render their forms inside this, so the sheet chrome is defined once.
-function SettingsSheet({ autoSort, setAutoSort, onClose }) {
-  return (
-    <Sheet title="Trip settings" onClose={onClose}>
-      <div className="setrow">
-        <div>
-          <div className="setrow-l">Auto-sort captures</div>
-          <div className="xs">Run the agent the moment you add a link, photo or note — no extra tap.</div>
-        </div>
-        <button className={"settoggle" + (autoSort ? " on" : "")} role="switch" aria-checked={autoSort} aria-label="Auto-sort captures" onClick={() => setAutoSort(v => !v)}>{autoSort ? <Check size={15} /> : null}</button>
-      </div>
-    </Sheet>
-  );
+function SettingsSheet({ ctx, autoSort, setAutoSort, onClose }) {
+const names = (ctx && ctx.names) || { one: "You", two: "Harriet" };
+const [one, setOne] = useState(names.one);
+const [two, setTwo] = useState(names.two);
+const dirty = one.trim() !== names.one || two.trim() !== names.two;
+const save = () => {
+const next = { one: one.trim() || "You", two: two.trim() || "Harriet" };
+const prev = names;
+mutate(ctx, {
+apply: () => ctx.setState(s => ({ ...s, names: next })),
+revert: () => ctx.setState(s => ({ ...s, names: prev })),
+op: { kind: "setTripSettings", args: { settings: next } },
+dbCall: () => ctx.db.setTripSettings(next),
+});
+ctx.flash("Names saved");
+onClose();
+};
+return (
+<Sheet title="Trip settings" onClose={onClose}>
+{ctx && ctx.canEdit && (
+<div className="setblock">
+<div className="setrow-l">Traveller names</div>
+<div className="xs">Used across the journal, ratings and recap.</div>
+<input className="authinput" value={one} onChange={e => setOne(e.target.value)} placeholder="First traveller (e.g. Kim)" aria-label="First traveller name" />
+<input className="authinput" value={two} onChange={e => setTwo(e.target.value)} placeholder="Second traveller (e.g. Harriet)" aria-label="Second traveller name" />
+<button className="primary" disabled={!dirty} onClick={save}>Save names</button>
+</div>
+)}
+<div className="setrow">
+<div>
+<div className="setrow-l">Auto-sort captures</div>
+<div className="xs">Run the agent the moment you add a link, photo or note — no extra tap.</div>
+</div>
+<button className={"settoggle" + (autoSort ? " on" : "")} role="switch" aria-checked={autoSort} aria-label="Auto-sort captures" onClick={() => setAutoSort(v => !v)}>{autoSort ? <Check size={15} /> : null}</button>
+</div>
+</Sheet>
+);
 }
 
 function Sheet({ title, onClose, children }) {
@@ -2560,6 +2585,8 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .sheettitle{font-family:var(--serif);font-size:20px;font-weight:800;letter-spacing:-.02em;}
 .sheetx{width:30px;height:30px;border-radius:0;background:var(--fill2);color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;}
 .setrow{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:8px 2px;}
+.setblock{display:flex;flex-direction:column;gap:8px;padding:14px 0;border-bottom:1px solid var(--hair,rgba(0,0,0,.08));}
+.setblock .authinput{margin:0;}
 .setrow-l{font-size:15px;font-weight:600;color:var(--ink);}
 .settoggle{flex:none;width:26px;height:26px;border-radius:0;background:var(--fill2);display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;margin-top:1px;transition:.15s cubic-bezier(.2,.8,.2,1);}
 .settoggle.on{background:var(--accent);}
