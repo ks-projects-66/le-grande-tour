@@ -1361,7 +1361,7 @@ onClick={() => setStatus(p.id, { been: !p.been })}>
 /* ============================== JOURNAL ============================== */
 
 function Journal(ctx) {
-const { state, setState, tIndex, stats, flash, canEdit, db, refresh, places } = ctx;
+const { state, setState, tIndex, stats, flash, canEdit, db, refresh, places, names } = ctx;
 const setStatus = useSetStatus(ctx);
 const d = ITINERARY[tIndex];
 const [type, setType] = useState("Meal");
@@ -1443,8 +1443,8 @@ return (
 {j.note && <div className="jcard-note">{j.note}</div>}
 {!!(j.photos || []).length && <PhotoGrid photos={j.photos} onOpen={(idx) => setViewer({ photos: j.photos, index: idx })} />}
 <div className="jcard-rate">
-<MiniStars label="You" v={j.you} />
-<MiniStars label="H" v={j.her} />
+<MiniStars label={names.one} v={j.you} />
+<MiniStars label={names.two} v={j.her} />
 {split && <span className="split">split decision</span>}
 </div>
 </div>
@@ -1460,8 +1460,8 @@ return (
 <div className="journal-stats">
 <Stat label="Meals" value={stats.meals} />
 <Stat label="Wines" value={stats.wines} />
-<Stat label="You" value={avg("you")} accent />
-<Stat label="Harriet" value={avg("her")} accent />
+<Stat label={names.one} value={avg("you")} accent />
+<Stat label={names.two} value={avg("her")} accent />
 </div>
 
 {stats.bestMeal && <div className="best"><Sparkles size={14} /><span>Best meal so far: <strong>{stats.bestMeal.title}</strong> ({stats.bestMeal.city})</span></div>}
@@ -1494,8 +1494,8 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style
 <input className="inline-input full" placeholder="Tasting note / thoughts…" value={note} onChange={e => setNote(e.target.value)} />
 <PhotoPicker files={files} setFiles={setFiles} flash={flash} canEdit={canEdit} />
 <div className="ratepair">
-<RateRow label="You" value={you} onChange={setYou} />
-<RateRow label="Harriet" value={her} onChange={setHer} />
+<RateRow label={names.one} value={you} onChange={setYou} />
+<RateRow label={names.two} value={her} onChange={setHer} />
 </div>
 <button className="primary" onClick={add} disabled={busy}><Plus size={15} /> {busy ? "Saving…" : "Add entry"}</button>
 </Card>
@@ -1539,7 +1539,7 @@ return (
 // and photos (remove existing, add new). Reuses the Add Entry form anatomy
 // inside an iOS-style bottom sheet so nothing new is added to the tab bar.
 function EditEntry({ entry, ctx, onClose }) {
-const { setState, flash, db, canEdit } = ctx;
+const { setState, flash, db, canEdit, names } = ctx;
 const [type, setType] = useState(entry.type);
 const [title, setTitle] = useState(entry.title);
 const [note, setNote] = useState(entry.note || "");
@@ -1618,8 +1618,8 @@ return <button key={tp} className={"typetab" + (type === tp ? " on" : "")} style
 )}
 <PhotoPicker files={files} setFiles={setFiles} flash={flash} canEdit={canEdit} />
 <div className="ratepair">
-<RateRow label="You" value={you} onChange={setYou} />
-<RateRow label="Harriet" value={her} onChange={setHer} />
+<RateRow label={names.one} value={you} onChange={setYou} />
+<RateRow label={names.two} value={her} onChange={setHer} />
 </div>
 <button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving…" : "Save changes"}</button>
 </Sheet>
@@ -2015,7 +2015,7 @@ return (
 }
 
 function RatePrompt({ place, ctx, setStatus }) {
-const { setState, tIndex, flash, canEdit, db } = ctx;
+const { setState, tIndex, flash, canEdit, db, names } = ctx;
 const [you, setYou] = useState(0);
 const [her, setHer] = useState(0);
 const [note, setNote] = useState("");
@@ -2051,7 +2051,7 @@ setBusy(false);
 return (
 <Card>
 <div className="prompt-q">{questionFor(place)}</div>
-<div className="ratepair"><RateRow label="You" value={you} onChange={setYou} /><RateRow label="Harriet" value={her} onChange={setHer} /></div>
+<div className="ratepair"><RateRow label={names.one} value={you} onChange={setYou} /><RateRow label={names.two} value={her} onChange={setHer} /></div>
 <input className="inline-input full" placeholder="A line on it (optional)…" value={note} onChange={e => setNote(e.target.value)} />
 <PhotoPicker files={files} setFiles={setFiles} flash={flash} canEdit={canEdit} />
 <button className="primary" onClick={save} disabled={busy}><Check size={15} /> {busy ? "Saving…" : "Save to journal"}</button>
@@ -2090,7 +2090,7 @@ return <div className="tripmap" ref={ref} />;
 }
 
 function TripRecap(ctx) {
-const { state, canEdit, session, flash } = ctx;
+const { state, canEdit, session, flash, names } = ctx;
 const [viewer, setViewer] = useState(null);
 const [story, setStory] = useState(() => { try { return JSON.parse(localStorage.getItem("euro26:story") || "null"); } catch (e) { return null; } });
 const [storyBusy, setStoryBusy] = useState(false);
@@ -2131,7 +2131,7 @@ return (
 <div className="muted xs">{label}</div>
 <div className="jcard-title">{j.title}{j.vintage ? <span className="vint"> {j.vintage}</span> : ""}</div>
 {(j.region || j.city) && <div className="muted xs">{[j.region, j.city].filter(Boolean).join(" · ")}</div>}
-<div className="jcard-rate"><MiniStars label="You" v={j.you} /><MiniStars label="H" v={j.her} /></div>
+<div className="jcard-rate"><MiniStars label={names.one} v={j.you} /><MiniStars label={names.two} v={j.her} /></div>
 </div>
 </div>
 );
