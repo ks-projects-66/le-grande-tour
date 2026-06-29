@@ -162,6 +162,7 @@ function privateTypeMeta(t){ return PRIVATE_TYPE_META[t] || PRIVATE_TYPE_META.no
 const VIBES = ["Fancy dinner","Long lunch","Quick bite","Coffee & cake","Wine bar","Cheap & cheerful","Sweet treat","Must-see","Hidden gem","Golden hour","Museum","Gallery","Historic site","Sightseeing","Winery","Browse & buy"];
 const CATS = ["Eat & Drink","See & Do","Shop"];
 const EXPLORE_CITIES = ["Paris","Bordeaux","Copenhagen","London"];
+const AUTOADD_MIN = 0.7;
 
 const SEED_PLACES = [
 { id:"bambino", city:"Paris", cat:"Eat & Drink", tag:"Wine bar", name:"Bambino", area:"11th arr. · rue Saint-Sébastien", note:"Natural wine and open-fire small plates in a vinyl-lined room; gets clubby late. Kitchen to 11pm, wine to 2am." },
@@ -734,6 +735,8 @@ const [viewerMode, setViewerMode] = useState(false);
 const [loaded, setLoaded] = useState(false);
 const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 const [toast, setToast] = useState("");
+const [undo, setUndo] = useState(null); // { msg, fn } | null
+const undoToast = (msg, fn) => { setUndo({ msg, fn }); setTimeout(() => setUndo(u => (u && u.fn === fn ? null : u)), 6000); };
 const [stale, setStale] = useState(false);
 const [state, setState] = useState(emptyState);
 const localPrefs = useRef({ weather:{}, planDone:{}, planAdd:{}, hotels:{} });
@@ -829,7 +832,7 @@ const meals = state.journal.filter(j => j.type === "Meal").length;
 const rated = state.journal.filter(j => j.you > 0);
 const bestMeal = [...state.journal].filter(j => j.type === "Meal").sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
 
-const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session };
+const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast };
 
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session && !viewerMode) return <div className="app"><Style /><AuthScreen onView={() => setViewerMode(true)} /></div>;
@@ -881,6 +884,7 @@ Couldn't load the latest trip data. Showing what's on this device — tap to ret
 </main>
 
 {toast && <div className="toast">{toast}</div>}
+{undo && <div className="toast undo" onClick={() => { undo.fn(); setUndo(null); }}>{undo.msg} · <strong>Undo</strong></div>}
 
 <nav className="tabbar">
 {[
@@ -1500,8 +1504,27 @@ return (
 
 /* ============================== EXPLORE ============================== */
 
+function MultiReview({ drafts, onAdd, onEdit, onClose }) {
+const [picked, setPicked] = useState(() => new Set(drafts.map(d => d.id)));
+const toggle = (id) => setPicked(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+return (
+<Sheet title={`Add places · ${drafts.length} found`} onClose={onClose}>
+{drafts.map(d => (
+<div key={d.id} className={"reviewrow" + (picked.has(d.id) ? " on" : "")}>
+<button className="reviewcheck" onClick={() => toggle(d.id)} aria-label="Toggle"><Check size={15} /></button>
+<div className="reviewbody" onClick={() => onEdit(d)}>
+<div className="reviewname">{d.name}</div>
+<div className="xs">{[d.city, d.tag].filter(Boolean).join(" · ")}{d.confidence < AUTOADD_MIN ? " · check this one" : ""}</div>
+</div>
+</div>
+))}
+<button className="primary" onClick={() => onAdd(drafts.filter(d => picked.has(d.id)))}>Add {picked.size} place{picked.size === 1 ? "" : "s"}</button>
+</Sheet>
+);
+}
+
 function Explore(ctx) {
-const { state, setState, tIndex, canEdit, db, flash, session } = ctx;
+const { state, setState, tIndex, canEdit, db, flash, session, undoToast } = ctx;
 const setStatus = useSetStatus(ctx);
 const here = ITINERARY[tIndex].city;
 const startCity = EXPLORE_CITIES.includes(here) ? here : "Paris";
@@ -1560,6 +1583,39 @@ note: place.note || it.raw,
 setSorting(null);
 setInboxId(it.id);
 setEditing(draft);
+};
+
+// Normalise a raw model item into a full place draft for this app.
+const toDraft = (it) => ({
+id: uid(),
+city: EXPLORE_CITIES.includes(it.city) ? it.city : (EXPLORE_CITIES.includes(city) ? city : "Paris"),
+cat: CATS.includes(it.cat) ? it.cat : "Eat & Drink",
+tag: VIBES.includes(it.tag) ? it.tag : VIBES[0],
+name: it.name || "",
+area: it.area || "",
+note: it.note || "",
+sources: Array.isArray(it.sources) ? it.sources : [],
+confidence: typeof it.confidence === "number" ? it.confidence : 0.6,
+});
+const [review, setReview] = useState(null); // drafts[] for MultiReview, or null
+// Route model items: auto-add the confident ones, review the rest.
+const reviewItems = (items, sourceInboxId) => {
+const drafts = (items || []).map(toDraft).filter(d => d.name);
+if (!drafts.length) { flash("Nothing to add — fill it in"); if (sourceInboxId) { setInboxId(sourceInboxId); setEditing(toDraft({ name: "" })); } return; }
+const confident = drafts.filter(d => d.confidence >= AUTOADD_MIN);
+const rest = drafts.filter(d => d.confidence < AUTOADD_MIN);
+if (drafts.length === 1 && !confident.length) { setInboxId(sourceInboxId || null); setEditing(drafts[0]); return; }
+if (confident.length) {
+setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), ...confident ] }));
+confident.forEach(p => db.addPlace(p).catch(() => {}));
+if (sourceInboxId) removeCapture(sourceInboxId);
+const ids = new Set(confident.map(p => p.id));
+undoToast(`Added ${confident.length} place${confident.length > 1 ? "s" : ""}`, () => {
+setState(s => ({ ...s, exploreAdded: (s.exploreAdded || []).filter(p => !ids.has(p.id)) }));
+confident.forEach(p => db.deletePlace && db.deletePlace(p.id).catch(() => {}));
+});
+}
+if (rest.length) setReview(rest);
 };
 
 return (
@@ -1630,6 +1686,10 @@ return (
 ? <AddPlace city={city} onCancel={() => setAdding(false)} onAdd={addPlace} />
 : <button className="addplace" onClick={() => setAdding(true)}><Plus size={16} /> Add a place</button>)}
 {editing && <EditPlace place={editing} inboxId={inboxId} ctx={ctx} onClose={() => { setEditing(null); setInboxId(null); }} />}
+{review && <MultiReview drafts={review}
+onEdit={(d) => { setReview(null); setEditing(d); }}
+onAdd={(chosen) => { setReview(null); if (chosen.length) { setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), ...chosen ] })); chosen.forEach(p => db.addPlace(p).catch(() => {})); flash(`Added ${chosen.length} place${chosen.length === 1 ? "" : "s"}`); } }}
+onClose={() => setReview(null)} />}
 </div>
 );
 }
@@ -2216,6 +2276,13 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .trayrow-actions{display:flex;align-items:center;gap:4px;flex:none;}
 .sortbtn{display:inline-flex;align-items:center;gap:6px;background:var(--powder);color:var(--accent);border-radius:0;padding:7px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--sans);}
 .sortbtn:disabled{opacity:.6;}
+.toast.undo{cursor:pointer;}
+.reviewrow{display:flex;gap:11px;align-items:center;padding:11px 2px;border-top:1px solid var(--line);}
+.reviewrow:first-of-type{border-top:none;}
+.reviewcheck{width:24px;height:24px;flex:none;border-radius:0;background:var(--fill2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.reviewrow.on .reviewcheck{background:var(--accent);}
+.reviewbody{flex:1;min-width:0;cursor:pointer;}
+.reviewname{font-size:15.5px;font-weight:600;letter-spacing:-.01em;}
 /* ===== Tour recap ===== */
 .recaphero{background:linear-gradient(135deg,#41599C 0%,#6F82BC 100%);color:#fff;border-radius:22px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow);}
 .recaphero-kicker{font-size:11px;font-weight:700;letter-spacing:.08em;opacity:.85;}
