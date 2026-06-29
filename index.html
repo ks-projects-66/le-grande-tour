@@ -491,6 +491,10 @@ async function aiCapture({ input = "", files = [], enrich = false }, accessToken
     if (f.type && f.type.startsWith("image/")) { try { g = await compressImage(f); } catch (e) {} }
     images.push({ mimeType: g.type || f.type || "image/jpeg", data: await fileToBase64(g) });
   }
+  // Guard oversized payloads (e.g. an iOS HEIC that failed to compress) so the
+  // request fails fast with a clear message instead of a slow dead end.
+  const b64Total = images.reduce((n, im) => n + (im.data ? im.data.length : 0), 0);
+  if (images.length && b64Total > 8000000) throw new Error("images too large");
   const r = await fetch(`${SUPABASE_URL}/functions/v1/assistant`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
@@ -1555,7 +1559,7 @@ const captureFiles = async (fileList) => {
   try {
     const items = await aiCapture({ files }, session && session.access_token);
     reviewItems(items);
-  } catch (e) { flash("Couldn't read that — try again"); }
+  } catch (e) { flash(String((e && e.message) || "").includes("too large") ? "Those photos are too large or unsupported — try a screenshot or JPEG" : "Couldn't read that — try again"); }
   setCapturing(false);
 };
 const removeCapture = (id) => {
@@ -1616,9 +1620,9 @@ return (
 <div className="capture-row">
 <input className="capture-input" placeholder="Paste a link or jot an idea…" value={cap} onChange={e => setCap(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addCapture(); }} />
 <button className="capture-add" onClick={addCapture} aria-label="Capture"><Plus size={16} /></button>
-<label className="capture-photo" aria-label="Add a photo">
+<label className={"capture-photo" + (capturing ? " busy" : "")} aria-label="Add a photo">
   <ImagePlus size={16} />
-  <input type="file" accept="image/*" multiple capture="environment" onChange={e => { captureFiles(e.target.files); e.target.value = ""; }} />
+  <input type="file" accept="image/*" multiple capture="environment" disabled={capturing} onChange={e => { captureFiles(e.target.files); e.target.value = ""; }} />
 </label>
 </div>
 {unsorted.length > 0 && (
@@ -2265,6 +2269,7 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .capture-photo{width:42px;flex:none;background:var(--fill);color:var(--ink2);border-radius:0;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .capture-photo input{display:none;}
 .capture-photo:active{background:var(--fill2);}
+.capture-photo.busy{opacity:.55;pointer-events:none;}
 .tray{margin-top:12px;}
 .tray-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
 .trayrow{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);}
