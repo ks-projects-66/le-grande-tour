@@ -512,6 +512,45 @@ if (error) throw error;
 },
 };
 
+/* ============================== OFFLINE WRITE QUEUE ============================== */
+// Simple serialisable mutations are queued here when offline (or on a network
+// failure) and replayed FIFO on reconnect. Photos are NEVER queued (online-only).
+// Replays are idempotent: writes are upserts-by-id or deletes, and a 23505
+// unique-violation (insert already applied) is treated as success.
+const QUEUE_KEY = "lgt:queue";
+function readQueue() { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch (e) { return []; } }
+function writeQueue(q) { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {} }
+function enqueue(op) { const q = readQueue(); q.push({ id: uid(), ts: Date.now(), ...op }); writeQueue(q); }
+function queueLength() { return readQueue().length; }
+async function replay(op) {
+switch (op.kind) {
+case "upsertStatus": return db.upsertStatus(op.args.placeId, op.args.patch);
+case "addPlace": return db.addPlace(op.args.place);
+case "upsertPlace": return db.upsertPlace(op.args.place);
+case "deletePlace": return db.deletePlace(op.args.id);
+case "addJournal": return db.addJournal(op.args.entry);
+case "updateJournal": return db.updateJournal(op.args.entry);
+case "deleteJournal": return db.deleteJournal(op.args.id);
+case "addInbox": return db.addInbox(op.args.item);
+case "deleteInbox": return db.deleteInbox(op.args.id);
+case "addPrivateNote": return db.addPrivateNote(op.args.note);
+case "deletePrivateNote": return db.deletePrivateNote(op.args.id);
+case "setTripSettings": return db.setTripSettings(op.args.settings);
+default: return;
+}
+}
+async function flushQueue(onChange, replayFn = replay) {
+if (!navigator.onLine) return;
+let q = readQueue();
+while (q.length) {
+const op = q[0];
+try { await replayFn(op); }
+catch (e) { if (!(e && e.code === "23505")) { return; } } // hard failure: stop, retry later
+q = readQueue(); q.shift(); writeQueue(q); if (onChange) onChange(queueLength());
+}
+if (onChange) onChange(0);
+}
+
 // Calls the assistant (place mode). Accepts free text or a URL (`input`) and/or
 // image File objects (`files`); returns an array of structured place items.
 // Throws on failure so callers can fall back to manual entry.
