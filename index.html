@@ -481,21 +481,6 @@ await supabase.from("inbox").delete().eq("id", id);
 },
 };
 
-// Calls the server-side agent (Supabase Edge Function) to turn a raw note or link
-// into a structured place. Authenticated users only; the Gemini key lives server
-// side. Throws on any failure so callers can fall back to manual entry.
-async function aiSortPlace(input, accessToken) {
-const r = await fetch(`${SUPABASE_URL}/functions/v1/assistant`, {
-method: "POST",
-headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
-body: JSON.stringify({ input }),
-});
-if (!r.ok) throw new Error("assistant request failed");
-const j = await r.json();
-if (j.error) throw new Error(j.error);
-return j.place || {};
-}
-
 // Calls the assistant (place mode). Accepts free text or a URL (`input`) and/or
 // image File objects (`files`); returns an array of structured place items.
 // Throws on failure so callers can fall back to manual entry.
@@ -1561,28 +1546,33 @@ setState(s => ({ ...s, inbox: [item, ...(s.inbox || [])] }));
 setCap("");
 db.addInbox(item).catch(() => flash("Could not save capture"));
 };
+const [capturing, setCapturing] = useState(false);
+const captureFiles = async (fileList) => {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  if (!canEdit) { flash("Sign in to capture"); return; }
+  setCapturing(true);
+  try {
+    const items = await aiCapture({ files }, session && session.access_token);
+    reviewItems(items);
+  } catch (e) { flash("Couldn't read that — try again"); }
+  setCapturing(false);
+};
 const removeCapture = (id) => {
 setState(s => ({ ...s, inbox: (s.inbox || []).filter(i => i.id !== id) }));
 db.deleteInbox(id).catch(() => {});
 };
 const sortItem = async (it) => {
-setSorting(it.id);
-let draft = { id: uid(), city: EXPLORE_CITIES.includes(city) ? city : "Paris", cat: "Eat & Drink", tag: VIBES[0], name: "", area: "", note: it.raw };
-try {
-const place = await aiSortPlace(it.raw, session && session.access_token);
-draft = {
-id: uid(),
-city: EXPLORE_CITIES.includes(place.city) ? place.city : draft.city,
-cat: CATS.includes(place.cat) ? place.cat : draft.cat,
-tag: VIBES.includes(place.tag) ? place.tag : draft.tag,
-name: place.name || "",
-area: place.area || "",
-note: place.note || it.raw,
-};
-} catch (e) { flash("Agent unavailable, fill it in"); }
-setSorting(null);
-setInboxId(it.id);
-setEditing(draft);
+  setSorting(it.id);
+  try {
+    const items = await aiCapture({ input: it.raw }, session && session.access_token);
+    reviewItems(items, it.id);
+  } catch (e) {
+    flash("Agent unavailable, fill it in");
+    setInboxId(it.id);
+    setEditing(toDraft({ name: "", note: it.raw }));
+  }
+  setSorting(null);
 };
 
 // Normalise a raw model item into a full place draft for this app.
@@ -1626,6 +1616,10 @@ return (
 <div className="capture-row">
 <input className="capture-input" placeholder="Paste a link or jot an idea…" value={cap} onChange={e => setCap(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addCapture(); }} />
 <button className="capture-add" onClick={addCapture} aria-label="Capture"><Plus size={16} /></button>
+<label className="capture-photo" aria-label="Add a photo">
+  <ImagePlus size={16} />
+  <input type="file" accept="image/*" multiple capture="environment" onChange={e => { captureFiles(e.target.files); e.target.value = ""; }} />
+</label>
 </div>
 {unsorted.length > 0 && (
 <div className="tray">
@@ -2268,6 +2262,9 @@ input,select,textarea,button{font-family:inherit;}select{appearance:none;-webkit
 .capture-input::placeholder{color:var(--muted);}
 .capture-add{width:42px;flex:none;background:var(--accent);color:#fff;border-radius:0;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .capture-add:active{background:var(--accent-d);}
+.capture-photo{width:42px;flex:none;background:var(--fill);color:var(--ink2);border-radius:0;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.capture-photo input{display:none;}
+.capture-photo:active{background:var(--fill2);}
 .tray{margin-top:12px;}
 .tray-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
 .trayrow{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);}
