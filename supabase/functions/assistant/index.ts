@@ -27,7 +27,7 @@ function json(o: unknown, status = 200) {
   return new Response(JSON.stringify(o), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
-const SYS_PLACE = `You convert a traveller's raw note or pasted link into ONE structured place for a trip app covering Paris, Bordeaux, Copenhagen, London. Rules: choose category strictly from the allowed list; choose tag strictly from the allowed list; set city only if clearly implied, else leave empty; if the input is a URL, use the linked page's actual content to fill the fields; NEVER invent facts (hours, prices, founding dates, ratings, claims) that are not present in the input or the linked page; the note field should only restate what the source actually says, concise, Australian English, no em dashes; if a field is unknown leave it empty. Respond with a single JSON object only, no markdown.`;
+const SYS_PLACE = `You convert a traveller's raw note, a pasted link, or a photo into structured places for a trip app covering Paris, Bordeaux, Copenhagen, London. The input may describe ONE place or MANY (a list, an article, a screenshot of several places) — return every distinct place you find. Rules: choose category strictly from the allowed list; choose tag strictly from the allowed list; set city only if clearly implied, else leave empty; if the input is a URL, use the linked page's actual content to fill the fields; if the input is an image, read the place name and any visible details from it; NEVER invent facts (hours, prices, founding dates, ratings, claims) that are not present in the input, the linked page, or the image; the note field should only restate what the source actually says, concise, Australian English, no em dashes; if a field is unknown leave it empty; set confidence from 0 to 1 for how certain the structured fields are. Respond with a single JSON object only, shaped {"items":[ ... ]}, no markdown.`;
 
 const SYS_STORY = `You write a short, warm recap of a couple's trip for their travel app. Australian English, second person plural ("you"). 2 to 3 short sentences, about 60 words, one paragraph. Base it ONLY on the supplied journal entries. Keep each place in the exact city it is listed under; do NOT move places between cities, and do NOT add landmarks, quotes, dishes or facts that are not in the entries. Warm and personal but grounded and accurate. No em dashes, no quotation marks, no lists, no headings.`;
 
@@ -56,10 +56,15 @@ const DOC_SCHEMA = {
   required: ["items"],
 };
 
-const PLACE_SCHEMA = {
+const PLACE_ITEM = {
   type: "object",
-  properties: { name: { type: "string" }, city: { type: "string" }, cat: { type: "string", enum: CATS }, tag: { type: "string", enum: TAGS }, area: { type: "string" }, note: { type: "string" } },
+  properties: { name: { type: "string" }, city: { type: "string" }, cat: { type: "string", enum: CATS }, tag: { type: "string", enum: TAGS }, area: { type: "string" }, note: { type: "string" }, confidence: { type: "number" } },
   required: ["name", "cat", "tag"],
+};
+const PLACES_SCHEMA = {
+  type: "object",
+  properties: { items: { type: "array", items: PLACE_ITEM } },
+  required: ["items"],
 };
 
 async function callGemini(key: string, payload: unknown) {
@@ -154,40 +159,54 @@ Deno.serve(async (req: Request) => {
       return json({ items });
     }
 
-    // ---- PLACE MODE: raw note or link -> one structured place ----
+    // ---- PLACE MODE: note / link / photo(s) -> one or more structured places ----
     const input = (bodyIn?.input || "").toString().trim();
-    if (!input) return json({ error: "empty input" }, 400);
-    const isUrl = /^https?:\/\//i.test(input);
-    const contents = [{ parts: [{ text: `Allowed categories: ${CATS.join(", ")}. Allowed tags: ${TAGS.join(", ")}. Allowed cities: ${CITIES.join(", ")}.\n\nRaw input: ${input}` }] }];
+    const images = Array.isArray(bodyIn?.images) ? bodyIn.images : [];
+    if (!input && !images.length) return json({ error: "empty input" }, 400);
+    const isUrl = !images.length && /^https?:\/\//i.test(input);
+
+    const baseText = `Allowed categories: ${CATS.join(", ")}. Allowed tags: ${TAGS.join(", ")}. Allowed cities: ${CITIES.join(", ")}.`
+      + (input ? `\n\nRaw input: ${input}` : `\n\nExtract the place(s) shown in the attached image(s).`);
+    const parts: any[] = [{ text: baseText }];
+    for (const im of images.slice(0, 4)) {
+      if (im?.data && im?.mimeType) parts.push({ inline_data: { mime_type: im.mimeType, data: im.data } });
+    }
+    const contents = [{ parts }];
 
     const buildPayload = (withTools: boolean) => {
       const p: any = {
         system_instruction: { parts: [{ text: SYS_PLACE }] },
         contents,
         // responseSchema cannot combine with tools, so the URL path relies on the
-        // prompt + server-side enum validation below instead of a hard schema.
+        // prompt + server-side validation below instead of a hard schema.
         generationConfig: withTools
-          ? { responseMimeType: "application/json", maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 0 } }
-          : { responseMimeType: "application/json", responseSchema: PLACE_SCHEMA, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 0 } },
+          ? { responseMimeType: "application/json", maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } }
+          : { responseMimeType: "application/json", responseSchema: PLACES_SCHEMA, maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
       };
       if (withTools) p.tools = [{ url_context: {} }];
       return p;
     };
 
-    // Links: let the model read the page (url_context). Fall back to the plain
-    // schema call if the tool path yields nothing, so behaviour never regresses.
+    // Links: read the page via url_context (no schema). Text/images: schema'd call.
     let txt = "";
     if (isUrl) { try { txt = extractText(await callGemini(K, buildPayload(true))); } catch (_) { txt = ""; } }
     if (!txt) { const g = await callGemini(K, buildPayload(false)); txt = extractText(g); if (!txt) return json({ error: "no result", detail: g?.error?.message || null }, 502); }
 
-    let place: Record<string, unknown>;
-    try { place = parseLooseJson(txt); } catch { return json({ error: "unparseable model output" }, 502); }
+    let parsed: any;
+    try { parsed = parseLooseJson(txt); } catch { return json({ error: "unparseable model output" }, 502); }
+    const rawItems = Array.isArray(parsed?.items) ? parsed.items : (parsed && parsed.name ? [parsed] : []);
+    const items = rawItems.slice(0, 15).map((it: any) => ({
+      name: (it?.name || "").toString().slice(0, 120),
+      city: CITIES.includes(it?.city) ? it.city : "",
+      cat: CATS.includes(it?.cat) ? it.cat : "",
+      tag: TAGS.includes(it?.tag) ? it.tag : "",
+      area: (it?.area || "").toString().slice(0, 120),
+      note: (it?.note || "").toString().slice(0, 600),
+      confidence: typeof it?.confidence === "number" ? Math.max(0, Math.min(1, it.confidence)) : 0.6,
+      sources: [] as Array<{ title: string; url: string }>,
+    })).filter((it: any) => it.name);
 
-    if (!CATS.includes(place.cat as string)) delete place.cat;
-    if (!TAGS.includes(place.tag as string)) delete place.tag;
-    if (place.city && !CITIES.includes(place.city as string)) place.city = "";
-
-    return json({ place });
+    return json({ items, place: items[0] || {} });
   } catch (e) {
     console.error("assistant error", String(e));
     return json({ error: String(e) }, 500);
