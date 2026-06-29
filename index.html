@@ -818,6 +818,7 @@ const [pendingShare, setPendingShare] = useState(null);
 const [autoSort, setAutoSort] = useState(() => { try { const v = localStorage.getItem("lgt:autosort"); return v === null ? true : v === "1"; } catch (e) { return true; } });
 useEffect(() => { try { localStorage.setItem("lgt:autosort", autoSort ? "1" : "0"); } catch (e) {} }, [autoSort]);
 const [settingsOpen, setSettingsOpen] = useState(false);
+const [pending, setPending] = useState(typeof localStorage === "undefined" ? 0 : queueLength());
 useEffect(() => {
   let sp; try { sp = new URLSearchParams(location.search); } catch (e) { return; }
   if (sp.get("shared") !== "1") return;
@@ -865,10 +866,12 @@ try { localStorage.setItem("euro26:prefs", JSON.stringify(prefs)); } catch (e) {
 };
 
 useEffect(() => {
-const onUp = () => setOnline(true); const onDown = () => setOnline(false);
+const onUp = () => { setOnline(true); flushQueue(setPending); };
+const onDown = () => setOnline(false);
 window.addEventListener("online", onUp); window.addEventListener("offline", onDown);
 return () => { window.removeEventListener("online", onUp); window.removeEventListener("offline", onDown); };
 }, []);
+useEffect(() => { if (queueLength()) flushQueue(setPending); }, []);
 
 useEffect(() => {
 supabase.auth.getSession().then(({ data }) => { setSession(data.session); setAuthChecked(true); });
@@ -948,7 +951,7 @@ const meals = state.journal.filter(j => j.type === "Meal").length;
 const rated = state.journal.filter(j => j.you > 0);
 const bestMeal = [...state.journal].filter(j => j.type === "Meal").sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
 
-const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare, autoSort, setAutoSort };
+const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare, autoSort, setAutoSort, setPending };
 
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session && !viewerMode) return <div className="app"><Style /><AuthScreen onView={() => setViewerMode(true)} /></div>;
@@ -969,8 +972,8 @@ return (
 </div>
 <div className="progress"><div className="progress-fill" style={{ width: `${((tIndex + 1) / TRIP.total) * 100}%` }} /></div>
 <div className="syncrow">
-<span className={"syncnote" + (!online ? " warn" : "")}>
-{!online ? "offline — showing saved trip" : session ? "Signed in · shared trip sync on" : "Viewer mode · sign in to edit"}
+<span className={"syncnote" + (!online ? " warn" : "") + (pending ? " warn" : "")}>
+{pending ? `${pending} change${pending === 1 ? "" : "s"} pending` : (!online ? "offline — showing saved trip" : session ? "Signed in · shared trip sync on" : "Viewer mode · sign in to edit")}
 </span>
 <div className="syncactions">
 <button className="signout" onClick={share}><Share2 size={12} /> Share</button>
