@@ -176,6 +176,14 @@ const SEED_PLACES = [
 
 const SEED_IDS = new Set(SEED_PLACES.map(p => p.id));
 
+// Trailing-edge debounce. wrapped.cancel() drops any pending call.
+function debounce(fn, ms) {
+  let t = null;
+  const wrapped = (...args) => { clearTimeout(t); t = setTimeout(() => { t = null; fn(...args); }, ms); };
+  wrapped.cancel = () => { clearTimeout(t); t = null; };
+  return wrapped;
+}
+
 function mergedPlaces(state) {
 const added = (state.exploreAdded || []);
 const byId = {};
