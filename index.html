@@ -1343,24 +1343,38 @@ if (!title.trim()) return;
 if (!canEdit) { flash("Sign in to add entries"); return; }
 setBusy(true);
 const entry = { id: uid(), type, title: title.trim(), note: note.trim(), you, her, region: region.trim(), vintage: vintage.trim(), city: d.city, day: tIndex, ts: Date.now(), place_id: null, photos: [] };
-try {
-await db.addJournal(entry);
-const uploaded = [];
-for (const f of files) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
-files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
-entry.photos = uploaded;
-setState(s => ({ ...s, journal: [entry, ...s.journal] }));
+const capturedFiles = files.slice();
 setTitle(""); setNote(""); setYou(0); setHer(0); setRegion(""); setVintage(""); setFiles([]);
+mutate(ctx, {
+apply: () => setState(s => ({ ...s, journal: [entry, ...s.journal] })),
+revert: () => setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== entry.id) })),
+op: { kind: "addJournal", args: { entry } },
+dbCall: () => db.addJournal(entry),
+});
+if (!navigator.onLine) {
+if (capturedFiles.length) flash("Saved offline — photos will need adding when you're back online.");
+// mutate already flashed "Saved offline — will sync" for the entry itself
+} else {
 flash("Saved");
-} catch (e) { flash("Could not save entry"); }
+if (capturedFiles.length) {
+const uploaded = [];
+for (const f of capturedFiles) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
+capturedFiles.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
+if (uploaded.length) setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, photos: [...(j.photos || []), ...uploaded] } : j) }));
+}
+}
 setBusy(false);
 };
-const del = async (id) => {
+const del = (id) => {
 if (!window.confirm("Delete this entry? Its photos will be removed too.")) return;
+if (!canEdit) { flash("Sign in to delete"); return; }
 const prev = state.journal;
-setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== id) }));
-if (!canEdit) { flash("Sign in to delete"); setState(s => ({ ...s, journal: prev })); return; }
-try { await db.deleteJournal(id); } catch (e) { flash("Delete failed"); setState(s => ({ ...s, journal: prev })); }
+mutate(ctx, {
+apply: () => setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== id) })),
+revert: () => setState(s => ({ ...s, journal: prev })),
+op: { kind: "deleteJournal", args: { id } },
+dbCall: () => db.deleteJournal(id),
+});
 };
 const avg = (k) => stats.rated.length ? (stats.rated.reduce((a, j) => a + j[k], 0) / stats.rated.length).toFixed(1) : "–";
 const toRate = mergedPlaces(state).filter(p => p.been && !p.rated);
@@ -1514,16 +1528,25 @@ if (!title.trim()) return;
 if (!canEdit) { flash("Sign in to edit"); return; }
 setBusy(true);
 const patch = { id: entry.id, type, title: title.trim(), note: note.trim(), you, her, region: region.trim(), vintage: vintage.trim(), city: city.trim() };
-try {
-await db.updateJournal(patch);
+const prevEntry = entry;
+const capturedFiles = files.slice();
+mutate(ctx, {
+apply: () => setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, ...patch } : j) })),
+revert: () => setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? prevEntry : j) })),
+op: { kind: "updateJournal", args: { entry: patch } },
+dbCall: () => db.updateJournal(patch),
+});
+if (!navigator.onLine) {
+if (capturedFiles.length) flash("Saved offline — photos will need adding when you're back online.");
+} else if (capturedFiles.length) {
 const uploaded = [];
-for (const f of files) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
-files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
+for (const f of capturedFiles) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
+capturedFiles.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
 const nextPhotos = [...photos, ...uploaded];
-setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, ...patch, photos: nextPhotos } : j) }));
+if (uploaded.length) setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, photos: nextPhotos } : j) }));
+}
 flash("Updated");
 onClose();
-} catch (e) { flash("Could not update entry"); }
 setBusy(false);
 };
 
@@ -1964,16 +1987,26 @@ if (!canEdit) { flash("Sign in to rate"); return; }
 setBusy(true);
 const day = place.plannedDay != null ? place.plannedDay : tIndex;
 const entry = { id: uid(), type: typeForPlace(place), title: place.name, note: note.trim(), you, her, region: "", vintage: "", city: place.city, day, ts: Date.now(), place_id: place.id, photos: [] };
-try {
-await db.addJournal(entry);
-const uploaded = [];
-for (const f of files) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
-files.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
-entry.photos = uploaded;
-setState(s => ({ ...s, journal: [entry, ...s.journal] }));
+const capturedFiles = files.slice();
+mutate(ctx, {
+apply: () => setState(s => ({ ...s, journal: [entry, ...s.journal] })),
+revert: () => setState(s => ({ ...s, journal: s.journal.filter(j => j.id !== entry.id) })),
+op: { kind: "addJournal", args: { entry } },
+dbCall: () => db.addJournal(entry),
+});
 setStatus(place.id, { rated: true });
+if (!navigator.onLine) {
+if (capturedFiles.length) flash("Saved offline — photos will need adding when you're back online.");
+else flash("Saved to journal");
+} else {
+if (capturedFiles.length) {
+const uploaded = [];
+for (const f of capturedFiles) { try { uploaded.push(await db.uploadPhoto(entry.id, f)); } catch (e) { flash("A photo failed to upload"); } }
+capturedFiles.forEach(f => { try { URL.revokeObjectURL(f.__preview); } catch (e) {} });
+if (uploaded.length) setState(s => ({ ...s, journal: s.journal.map(j => j.id === entry.id ? { ...j, photos: uploaded } : j) }));
+}
 flash("Saved to journal");
-} catch (e) { flash("Could not save"); }
+}
 setBusy(false);
 };
 return (
