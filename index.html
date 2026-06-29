@@ -1479,7 +1479,11 @@ const [area, setArea] = useState(place.area || "");
 const [note, setNote] = useState(place.note || "");
 const setStatus = useSetStatus(ctx);
 const [plan, setPlan] = useState(place.plannedDay != null ? place.plannedDay : null);
-useEffect(() => { setPlan(null); }, [city]);
+const firstCity = useRef(true);
+useEffect(() => {
+  if (firstCity.current) { firstCity.current = false; return; }
+  setPlan(null);
+}, [city]);
 const fitDays = ITINERARY.map((d, i) => ({ i, d })).filter(x => x.d.city === city);
 const [busy, setBusy] = useState(false);
 
@@ -1497,7 +1501,7 @@ return { ...s, exploreAdded: exists ? list.map(x => x.id === saved.id ? saved : 
 });
 try {
 await db.upsertPlace(saved);
-if (plan != null && plan !== place.plannedDay) setStatus(saved.id, { plannedDay: plan });
+if (plan !== place.plannedDay) setStatus(saved.id, { plannedDay: plan });
 if (inboxId) { setState(s => ({ ...s, inbox: (s.inbox || []).filter(i => i.id !== inboxId) })); db.deleteInbox(inboxId).catch(() => {}); }
 flash(inboxId ? "Added to Explore" : "Place updated");
 onClose();
