@@ -10,7 +10,7 @@
  *
  * Bump VERSION to roll the cache.
  */
-const VERSION = "lgt-v3";
+const VERSION = "lgt-v4";
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
@@ -22,13 +22,40 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => k !== VERSION && k !== "lgt-share").map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });
 
 self.addEventListener("fetch", (e) => {
   const req = e.request;
+  // Web Share Target: stash the shared payload, then redirect into the app.
+  if (req.method === "POST") {
+    let u;
+    try { u = new URL(req.url); } catch (_) { return; }
+    if (u.pathname.endsWith("/share-target")) {
+      e.respondWith((async () => {
+        try {
+          const form = await req.formData();
+          const meta = {
+            title: (form.get("title") || "").toString(),
+            text: (form.get("text") || "").toString(),
+            url: (form.get("url") || "").toString(),
+            hasFile: false,
+          };
+          const file = form.get("media");
+          const cache = await caches.open("lgt-share");
+          if (file && typeof file !== "string" && file.size) {
+            await cache.put(new URL("__shared_file", self.location), new Response(file, { headers: { "Content-Type": file.type || "application/octet-stream" } }));
+            meta.hasFile = true;
+          }
+          await cache.put(new URL("__shared_meta", self.location), new Response(JSON.stringify(meta), { headers: { "Content-Type": "application/json" } }));
+        } catch (_) {}
+        return Response.redirect("./?shared=1", 303);
+      })());
+      return;
+    }
+  }
   if (req.method !== "GET") return;
 
   let url;
