@@ -1594,32 +1594,49 @@ setBusy(true);
 const saved = { id: place.id, city, cat, tag, name: name.trim(), area: area.trim(), note: note.trim() };
 const dup = findDup(mergedPlaces(state), saved.name, saved.city, saved.id);
 if (dup) { flash(`Already saved — ${dup.name}`); setBusy(false); return; }
-setState(s => {
+const prevList = state.exploreAdded || [];
+const prevExists = prevList.some(x => x.id === saved.id);
+const prevPlace = prevList.find(x => x.id === saved.id);
+mutate(ctx, {
+apply: () => setState(s => {
 const list = s.exploreAdded || [];
 const exists = list.some(x => x.id === saved.id);
 return { ...s, exploreAdded: exists ? list.map(x => x.id === saved.id ? saved : x) : [...list, saved] };
-});
-try {
+}),
+revert: () => setState(s => {
+const list = s.exploreAdded || [];
+if (!prevExists) return { ...s, exploreAdded: list.filter(x => x.id !== saved.id) };
+return { ...s, exploreAdded: list.map(x => x.id === saved.id ? prevPlace : x) };
+}),
+op: { kind: "upsertPlace", args: { place: saved } },
+dbCall: async () => {
 await db.upsertPlace(saved);
 if (plan !== place.plannedDay) setStatus(saved.id, { plannedDay: plan });
 if (inboxId) { setState(s => ({ ...s, inbox: (s.inbox || []).filter(i => i.id !== inboxId) })); db.deleteInbox(inboxId).catch(() => {}); }
+},
+});
 flash(inboxId ? "Added to Explore" : "Place updated");
 onClose();
-}
-catch (e) { flash("Could not update place"); }
 setBusy(false);
 };
 
-const remove = async () => {
+const remove = () => {
 if (!window.confirm("Delete this place? This cannot be undone.")) return;
 if (!canEdit) { flash("Sign in to delete"); return; }
-setState(s => {
+const prevAdded = state.exploreAdded || [];
+const prevStatus = state.exploreStatus || {};
+mutate(ctx, {
+apply: () => setState(s => {
 const status = { ...(s.exploreStatus || {}) };
 delete status[place.id];
 return { ...s, exploreAdded: (s.exploreAdded || []).filter(x => x.id !== place.id), exploreStatus: status };
+}),
+revert: () => setState(s => ({ ...s, exploreAdded: prevAdded, exploreStatus: prevStatus })),
+op: { kind: "deletePlace", args: { id: place.id } },
+dbCall: () => db.deletePlace(place.id),
 });
-try { await db.deletePlace(place.id); flash("Place removed"); onClose(); }
-catch (e) { flash("Could not remove place"); }
+flash("Place removed");
+onClose();
 };
 
 return (
@@ -1687,11 +1704,15 @@ const doneCount = places.filter(p => p.been).length;
 const cityDays = ITINERARY.map((d, i) => ({ i, d })).filter(x => x.d.city === city);
 const byCat = CATS.map(cat => ({ cat, items: shown.filter(p => p.cat === cat) })).filter(g => g.items.length);
 
-const addPlace = async (place) => {
+const addPlace = (place) => {
 if (!canEdit) { flash("Sign in to add places"); return; }
-setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), place ] }));
 setAdding(false);
-try { await db.addPlace(place); } catch (e) { flash("Could not save place"); }
+mutate(ctx, {
+apply: () => setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), place ] })),
+revert: () => setState(s => ({ ...s, exploreAdded: (s.exploreAdded || []).filter(p => p.id !== place.id) })),
+op: { kind: "addPlace", args: { place } },
+dbCall: () => db.addPlace(place),
+});
 };
 
 const unsorted = (state.inbox || []).filter(i => !i.sorted);
@@ -1775,10 +1796,14 @@ const confident = drafts.filter(d => d.confidence >= AUTOADD_MIN);
 const rest = drafts.filter(d => d.confidence < AUTOADD_MIN);
 if (drafts.length === 1 && !confident.length) { setInboxId(sourceInboxId || null); setEditing(drafts[0]); return; }
 if (confident.length) {
-setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), ...confident ] }));
-confident.forEach(p => db.addPlace(p).catch(() => {}));
 if (sourceInboxId) removeCapture(sourceInboxId);
 const ids = new Set(confident.map(p => p.id));
+confident.forEach(p => mutate(ctx, {
+apply: () => setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), p ] })),
+revert: () => setState(s => ({ ...s, exploreAdded: (s.exploreAdded || []).filter(x => x.id !== p.id) })),
+op: { kind: "addPlace", args: { place: p } },
+dbCall: () => db.addPlace(p),
+}));
 undoToast(`Added ${confident.length} place${confident.length > 1 ? "s" : ""}`, () => {
 setState(s => ({ ...s, exploreAdded: (s.exploreAdded || []).filter(p => !ids.has(p.id)) }));
 confident.forEach(p => db.deletePlace && db.deletePlace(p.id).catch(() => {}));
@@ -1887,7 +1912,7 @@ onAdd={(chosen) => {
     seen.add(k); return true;
   });
   const skipped = (chosen || []).length - add.length;
-  if (add.length) { setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), ...add ] })); add.forEach(p => db.addPlace(p).catch(() => {})); }
+  if (add.length) { add.forEach(p => mutate(ctx, { apply: () => setState(s => ({ ...s, exploreAdded: [ ...(s.exploreAdded || []), p ] })), revert: () => setState(s => ({ ...s, exploreAdded: (s.exploreAdded || []).filter(x => x.id !== p.id) })), op: { kind: "addPlace", args: { place: p } }, dbCall: () => db.addPlace(p) })); }
   flash(add.length ? `Added ${add.length} place${add.length === 1 ? "" : "s"}${skipped ? `, skipped ${skipped}` : ""}` : "Already saved");
 }}
 onClose={() => setReview(null)} />}
