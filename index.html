@@ -728,6 +728,26 @@ const [undo, setUndo] = useState(null); // { msg, fn } | null
 const undoToast = (msg, fn) => { setUndo({ msg, fn }); setTimeout(() => setUndo(u => (u && u.fn === fn ? null : u)), 6000); };
 const [stale, setStale] = useState(false);
 const [state, setState] = useState(emptyState);
+const [pendingShare, setPendingShare] = useState(null);
+useEffect(() => {
+  let sp; try { sp = new URLSearchParams(location.search); } catch (e) { return; }
+  if (sp.get("shared") !== "1") return;
+  (async () => {
+    let meta = null, file = null;
+    try {
+      const cache = await caches.open("lgt-share");
+      const metaRes = await cache.match(new URL("__shared_meta", location.href));
+      if (metaRes) meta = await metaRes.json();
+      const fileRes = await cache.match(new URL("__shared_file", location.href));
+      if (fileRes) { const blob = await fileRes.blob(); file = new File([blob], "shared", { type: blob.type || "image/jpeg" }); }
+      await cache.delete(new URL("__shared_meta", location.href));
+      await cache.delete(new URL("__shared_file", location.href));
+    } catch (e) {}
+    const input = meta ? (meta.url || meta.text || meta.title || "") : "";
+    if (file || input) { setPendingShare({ input, file }); setTab("explore"); }
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  })();
+}, []);
 const localPrefs = useRef({ weather:{}, planDone:{}, planAdd:{}, hotels:{} });
 const [theme, setTheme] = useState(() => {
   try { return localStorage.getItem("lgt:theme") || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch(e){ return "light"; }
@@ -821,7 +841,7 @@ const meals = state.journal.filter(j => j.type === "Meal").length;
 const rated = state.journal.filter(j => j.you > 0);
 const bestMeal = [...state.journal].filter(j => j.type === "Meal").sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
 
-const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast };
+const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare };
 
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session && !viewerMode) return <div className="app"><Style /><AuthScreen onView={() => setViewerMode(true)} /></div>;
@@ -1513,7 +1533,7 @@ return (
 }
 
 function Explore(ctx) {
-const { state, setState, tIndex, canEdit, db, flash, session, undoToast } = ctx;
+const { state, setState, tIndex, canEdit, db, flash, session, undoToast, pendingShare, setPendingShare } = ctx;
 const setStatus = useSetStatus(ctx);
 const here = ITINERARY[tIndex].city;
 const startCity = EXPLORE_CITIES.includes(here) ? here : "Paris";
@@ -1541,13 +1561,13 @@ try { await db.addPlace(place); } catch (e) { flash("Could not save place"); }
 };
 
 const unsorted = (state.inbox || []).filter(i => !i.sorted);
-const addCapture = () => {
-const text = cap.trim();
+const addCapture = (text0) => {
+const text = (typeof text0 === "string" ? text0 : cap).trim();
 if (!text) return;
 if (!canEdit) { flash("Sign in to capture"); return; }
 const item = { id: uid(), raw: text, kind: text.toLowerCase().startsWith("http") ? "link" : "note", city: "", sorted: false, created_at: new Date().toISOString() };
 setState(s => ({ ...s, inbox: [item, ...(s.inbox || [])] }));
-setCap("");
+if (typeof text0 !== "string") setCap("");
 db.addInbox(item).catch(() => flash("Could not save capture"));
 };
 const [capturing, setCapturing] = useState(false);
@@ -1611,6 +1631,22 @@ confident.forEach(p => db.deletePlace && db.deletePlace(p.id).catch(() => {}));
 }
 if (rest.length) setReview(rest);
 };
+
+useEffect(() => {
+  if (!pendingShare) return;
+  const { input, file } = pendingShare;
+  setPendingShare(null);
+  if (file) { captureFiles([file]); return; }
+  if (!input) return;
+  (async () => {
+    setSorting("__shared");
+    try {
+      const items = await aiCapture({ input }, session && session.access_token);
+      reviewItems(items);
+    } catch (e) { addCapture(input); flash("Saved to sort — agent unavailable"); }
+    setSorting(null);
+  })();
+}, [pendingShare]);
 
 return (
 <div className="page">
