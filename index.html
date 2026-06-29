@@ -54,7 +54,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Tables whose changes should trigger a live refetch. (Realtime is enabled on
 // these in the Supabase publication.) Task adds trip_settings later.
-const REALTIME_TABLES = ["places", "place_status", "journal_entries", "journal_photos", "inbox", "private_notes"];
+const REALTIME_TABLES = ["places", "place_status", "journal_entries", "journal_photos", "inbox", "private_notes", "trip_settings"];
 
 /* ============================== DATA ============================== */
 
@@ -206,7 +206,7 @@ const js = shared.journal || []; const adds = shared.exploreAdded || []; const s
 let newest = 0; for (const j of js) { if ((j.ts || 0) > newest) newest = j.ts || 0; }
 const stKeys = Object.keys(st);
 let stSum = 0; for (const k of stKeys) { const s = st[k] || {}; stSum += (s.been ? 1 : 0) + (s.rated ? 2 : 0) + ((s.plannedDay == null ? 0 : s.plannedDay + 1) * 4); }
-return `${js.length}:${adds.length}:${stKeys.length}:${newest}:${stSum}`;
+return `${js.length}:${adds.length}:${stKeys.length}:${newest}:${stSum}:${(shared.names&&shared.names.one)||""}:${(shared.names&&shared.names.two)||""}`;
 }
 // Normalised key for duplicate detection: name (letters/digits only, accent-folded)
 // + lowercased city. Two places with the same key are considered the same place.
@@ -396,11 +396,12 @@ return blob || file;
 // NOTE: private_notes is intentionally NOT fetched here. It is authenticated-only
 // and loaded separately via loadPrivateNotes() so viewer mode never requests it.
 async function loadAll() {
-const [placesRes, statusRes, journalRes, photosRes] = await Promise.all([
+const [placesRes, statusRes, journalRes, photosRes, settingsRes] = await Promise.all([
 supabase.from("places").select("*"),
 supabase.from("place_status").select("*"),
 supabase.from("journal_entries").select("*").order("ts", { ascending: false }),
 supabase.from("journal_photos").select("*"),
+supabase.from("trip_settings").select("*").eq("id", "trip").maybeSingle(),
 ]);
 // If the core tables both failed (network down, Supabase outage), surface it
 // rather than silently rendering an empty trip.
@@ -419,7 +420,10 @@ id: r.id, type: r.type, title: r.title, note: r.note || "", you: r.you || 0, her
 region: r.region || "", vintage: r.vintage || "", city: r.city || "", day: r.day, ts: r.ts, place_id: r.place_id || null,
 photos: photosByJournal[r.id] || [],
 }));
-return { exploreAdded, exploreStatus, journal };
+const names = settingsRes && settingsRes.data
+? { one: settingsRes.data.name_one || "You", two: settingsRes.data.name_two || "Harriet" }
+: { one: "You", two: "Harriet" };
+return { exploreAdded, exploreStatus, journal, names };
 }
 
 // Authenticated-only load of private logistics. Returns {} on any denial/error
@@ -518,6 +522,15 @@ if (error) throw error;
 },
 async deleteInbox(id) {
 const { error } = await supabase.from("inbox").delete().eq("id", id);
+if (error) throw error;
+},
+async getTripSettings() {
+const { data, error } = await supabase.from("trip_settings").select("*").eq("id", "trip").maybeSingle();
+if (error) throw error;
+return data ? { one: data.name_one || "You", two: data.name_two || "Harriet" } : null;
+},
+async setTripSettings(s) {
+const { error } = await supabase.from("trip_settings").upsert({ id: "trip", name_one: s.one, name_two: s.two, updated_at: new Date().toISOString() }, { onConflict: "id" });
 if (error) throw error;
 },
 };
@@ -772,7 +785,7 @@ Moment:{ icon: Sparkles,       color: "var(--c-moment)", bg: "var(--c-moment-bg)
 };
 
 const emptyState = {
-weather: {}, planDone: {}, planAdd: {}, journal: [], hotels: {}, exploreStatus: {}, exploreAdded: [], privateNotes: [], inbox: [],
+weather: {}, planDone: {}, planAdd: {}, journal: [], hotels: {}, exploreStatus: {}, exploreAdded: [], privateNotes: [], inbox: [], names: { one: "You", two: "Harriet" },
 };
 
 /* ============================== AUTH SCREEN ============================== */
@@ -867,7 +880,7 @@ try { const v = localStorage.getItem("euro26:prefs"); if (v) { const p = JSON.pa
 // on launch and survives a dropped connection. Photos keep their remote URLs.
 try {
 const c = JSON.parse(localStorage.getItem("euro26:shared") || "null");
-if (c && Array.isArray(c.journal)) setState(s => ({ ...s, journal: c.journal, exploreAdded: c.exploreAdded || s.exploreAdded, exploreStatus: c.exploreStatus || s.exploreStatus }));
+if (c && Array.isArray(c.journal)) setState(s => ({ ...s, journal: c.journal, exploreAdded: c.exploreAdded || s.exploreAdded, exploreStatus: c.exploreStatus || s.exploreStatus, names: c.names || s.names }));
 } catch (e) {}
 }, []);
 const persistPrefs = (next) => {
@@ -903,7 +916,7 @@ setState(s => ({ ...s, ...localPrefs.current, ...shared, ...priv }));
 const sig = sharedSig(shared);
 if (sig !== lastSharedSig.current) {
 lastSharedSig.current = sig;
-try { localStorage.setItem("euro26:shared", JSON.stringify({ journal: shared.journal, exploreAdded: shared.exploreAdded, exploreStatus: shared.exploreStatus })); } catch (e) {}
+try { localStorage.setItem("euro26:shared", JSON.stringify({ journal: shared.journal, exploreAdded: shared.exploreAdded, exploreStatus: shared.exploreStatus, names: shared.names })); } catch (e) {}
 }
 setStale(false);
 setLoaded(true);
@@ -967,7 +980,7 @@ const meals = state.journal.filter(j => j.type === "Meal").length;
 const rated = state.journal.filter(j => j.you > 0);
 const bestMeal = [...state.journal].filter(j => j.type === "Meal").sort((a, b) => (b.you + b.her) - (a.you + a.her))[0];
 
-const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare, autoSort, setAutoSort, setPending, places };
+const ctx = { state, setState, setLocal, tIndex, copy, flash, uid, setTab, canEdit, refresh, db, session, undoToast, pendingShare, setPendingShare, autoSort, setAutoSort, setPending, places, names: state.names || { one: "You", two: "Harriet" } };
 
 if (!authChecked) return <div className="app"><Style /></div>;
 if (!session && !viewerMode) return <div className="app"><Style /><AuthScreen onView={() => setViewerMode(true)} /></div>;
