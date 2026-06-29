@@ -495,6 +495,27 @@ if (j.error) throw new Error(j.error);
 return j.place || {};
 }
 
+// Calls the assistant (place mode). Accepts free text or a URL (`input`) and/or
+// image File objects (`files`); returns an array of structured place items.
+// Throws on failure so callers can fall back to manual entry.
+async function aiCapture({ input = "", files = [], enrich = false }, accessToken) {
+  const images = [];
+  for (const f of (files || []).slice(0, 4)) {
+    let g = f;
+    if (f.type && f.type.startsWith("image/")) { try { g = await compressImage(f); } catch (e) {} }
+    images.push({ mimeType: g.type || f.type || "image/jpeg", data: await fileToBase64(g) });
+  }
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/assistant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${accessToken}` },
+    body: JSON.stringify({ mode: "place", input, images, enrich }),
+  });
+  if (!r.ok) throw new Error("assistant request failed");
+  const j = await r.json();
+  if (j.error) throw new Error(j.error);
+  return Array.isArray(j.items) ? j.items : (j.place && j.place.name ? [j.place] : []);
+}
+
 // Asks the same edge function (story mode) to write a short, grounded trip recap
 // from the journal entries. Authenticated users only; key stays server side.
 async function aiStory(entries, trip, accessToken) {
