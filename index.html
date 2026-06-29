@@ -551,6 +551,22 @@ q = readQueue(); q.shift(); writeQueue(q); if (onChange) onChange(queueLength())
 if (onChange) onChange(0);
 }
 
+// Central optimistic-write wrapper: apply now, then persist. On a server
+// rejection, revert; on offline/network failure, enqueue and keep the optimistic
+// state. One place for all write safety so call sites stay thin.
+async function mutate(ctx, { apply, revert, op, dbCall }) {
+apply();
+if (!navigator.onLine) {
+enqueue(op); ctx.flash("Saved offline — will sync"); if (ctx.setPending) ctx.setPending(queueLength()); return;
+}
+try { await dbCall(); await flushQueue(ctx.setPending); }
+catch (err) {
+const networky = (err && /fetch|network/i.test(err.message || "")) || navigator.onLine === false;
+if (networky) { enqueue(op); ctx.flash("Saved offline — will sync"); if (ctx.setPending) ctx.setPending(queueLength()); }
+else { revert(); ctx.flash("Couldn't save — reverted"); }
+}
+}
+
 // Calls the assistant (place mode). Accepts free text or a URL (`input`) and/or
 // image File objects (`files`); returns an array of structured place items.
 // Throws on failure so callers can fall back to manual entry.
