@@ -431,27 +431,33 @@ return { privateNotes, inbox };
 
 const db = {
 async addPlace(p) {
-await supabase.from("places").insert({ id: p.id, city: p.city, cat: p.cat, tag: p.tag, name: p.name, area: p.area || null, note: p.note || null });
+const { error } = await supabase.from("places").insert({ id: p.id, city: p.city, cat: p.cat, tag: p.tag, name: p.name, area: p.area || null, note: p.note || null });
+if (error) throw error;
 },
 async upsertPlace(p) {
-await supabase.from("places").upsert({ id: p.id, city: p.city, cat: p.cat, tag: p.tag, name: p.name, area: p.area || null, note: p.note || null }, { onConflict: "id" });
+const { error } = await supabase.from("places").upsert({ id: p.id, city: p.city, cat: p.cat, tag: p.tag, name: p.name, area: p.area || null, note: p.note || null }, { onConflict: "id" });
+if (error) throw error;
 },
 async deletePlace(id) {
-await supabase.from("place_status").delete().eq("place_id", id);
-await supabase.from("places").delete().eq("id", id);
+const r1 = await supabase.from("place_status").delete().eq("place_id", id);
+if (r1.error) throw r1.error;
+const r2 = await supabase.from("places").delete().eq("id", id);
+if (r2.error) throw r2.error;
 },
 async upsertStatus(placeId, patch) {
 const row = { place_id: placeId, updated_at: new Date().toISOString() };
 if ("plannedDay" in patch) row.planned_day = patch.plannedDay;
 if ("been" in patch) row.been = patch.been;
 if ("rated" in patch) row.rated = patch.rated;
-await supabase.from("place_status").upsert(row, { onConflict: "place_id" });
+const { error } = await supabase.from("place_status").upsert(row, { onConflict: "place_id" });
+if (error) throw error;
 },
 async addJournal(j) {
-await supabase.from("journal_entries").insert({
+const { error } = await supabase.from("journal_entries").insert({
 id: j.id, type: j.type, title: j.title, note: j.note || null, you: j.you || 0, her: j.her || 0,
 region: j.region || null, vintage: j.vintage || null, city: j.city || null, day: j.day, ts: j.ts, place_id: j.place_id || null,
 });
+if (error) throw error;
 },
 async deleteJournal(id) {
 // journal_photos cascade-delete via FK; also remove storage objects first.
@@ -486,19 +492,23 @@ if (photo.path) await supabase.storage.from(PHOTO_BUCKET).remove([photo.path]);
 await supabase.from("journal_photos").delete().eq("id", photo.id);
 },
 async addPrivateNote(n) {
-await supabase.from("private_notes").insert({
+const { error } = await supabase.from("private_notes").insert({
 id: n.id, day: n.day, type: n.type, title: n.title,
 body: n.body || null, ref: n.ref || null, url: n.url || null, sort_order: n.sort_order || 0,
 });
+if (error) throw error;
 },
 async deletePrivateNote(id) {
-await supabase.from("private_notes").delete().eq("id", id);
+const { error } = await supabase.from("private_notes").delete().eq("id", id);
+if (error) throw error;
 },
 async addInbox(item) {
-await supabase.from("inbox").insert({ id: item.id, raw: item.raw, kind: item.kind || null, city: item.city || null, sorted: false });
+const { error } = await supabase.from("inbox").insert({ id: item.id, raw: item.raw, kind: item.kind || null, city: item.city || null, sorted: false });
+if (error) throw error;
 },
 async deleteInbox(id) {
-await supabase.from("inbox").delete().eq("id", id);
+const { error } = await supabase.from("inbox").delete().eq("id", id);
+if (error) throw error;
 },
 };
 
